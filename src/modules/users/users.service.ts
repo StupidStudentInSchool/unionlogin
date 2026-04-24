@@ -199,7 +199,8 @@ export class UsersService {
     const client = getSupabaseClient();
     let query = client.from('users').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
     
-    if (tenantId) {
+    // 只有当 tenantId 有效（不是 'default' 且不是 undefined）时才过滤
+    if (tenantId && tenantId !== 'default') {
       query = query.eq('tenant_id', tenantId);
     }
 
