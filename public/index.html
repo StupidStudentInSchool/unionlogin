@@ -67,7 +67,9 @@
         const res = await fetch(`${API_BASE}/api/tenants`);
         const data = await res.json();
 
-        if (data.tenants && data.tenants.length > 0) {
+        // API 返回格式: {success: true, data: [...]} 或 {data: [...]}
+        const tenants = data.data || [];
+        if (tenants.length > 0) {
           window.location.href = '/login.html';
         } else {
           window.location.href = '/setup.html';
