@@ -289,79 +289,42 @@
       document.getElementById('step2-label').classList.remove('text-gray-800');
     });
 
-    // 完成初始化
+    // 完成初始化 - 使用统一 API（事务处理）
     document.getElementById('form2').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('btn-finish');
       btn.disabled = true;
       btn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> 初始化中...';
 
+      const tenantName = document.getElementById('tenant-name').value;
+      const tenantSlug = document.getElementById('tenant-slug').value;
       const username = document.getElementById('username').value;
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-      const tenantName = document.getElementById('tenant-name').value;
-      const tenantSlug = document.getElementById('tenant-slug').value;
-
-      // 先检查 slug 是否可用
-      const slugAvailable = await checkSlug(tenantSlug);
-      if (!slugAvailable) {
-        showError('error2', '该租户标识已被使用，请换一个');
-        btn.disabled = false;
-        btn.innerHTML = '完成初始化';
-        return;
-      }
 
       try {
-        // 1. 创建租户
-        const tenantRes = await fetch(`${API}/api/tenants`, {
+        const res = await fetch(`${API}/api/init`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: tenantName, slug: tenantSlug }),
+          body: JSON.stringify({ tenantName, tenantSlug, username, email, password }),
         });
-        const tenantData = await tenantRes.json();
-        const tenantId = tenantData.data?.id;
-        if (!tenantId) {
-          // 可能是 slug 重复，检查错误信息
-          const msg = tenantData.message || tenantData.data?.message || '';
-          if (msg.includes('unique') || msg.includes('已被使用')) {
-            throw new Error('该租户标识已被使用，请换一个');
-          }
-          throw new Error(msg || '创建租户失败');
+        const result = await res.json();
+
+        if (result.success && result.data && result.data.token) {
+          const data = result.data;
+          localStorage.setItem(STORAGE_KEYS.token, data.token.accessToken);
+          localStorage.setItem(STORAGE_KEYS.refresh, data.token.refreshToken);
+          localStorage.setItem(STORAGE_KEYS.tenant, data.tenant.id);
+          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
+
+          document.getElementById('step2').classList.add('hidden');
+          document.getElementById('step-success').classList.remove('hidden');
+          setTimeout(() => window.location.href = '/dashboard.html', 2000);
+        } else {
+          throw new Error(result.message || '初始化失败');
         }
-
-        // 2. 注册用户
-        const userRes = await fetch(`${API}/api/users/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
-          body: JSON.stringify({ username, email, password }),
-        });
-        const userData = await userRes.json();
-        if (!userData.data?.id) {
-          throw new Error(userData.message || userData.data?.message || '创建用户失败');
-        }
-
-        // 3. 登录
-        const loginRes = await fetch(`${API}/api/users/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
-          body: JSON.stringify({ login: username, password }),
-        });
-        const loginData = await loginRes.json();
-        if (!loginData.data?.accessToken) {
-          throw new Error(loginData.message || '登录失败');
-        }
-
-        localStorage.setItem(STORAGE_KEYS.token, loginData.data.accessToken);
-        localStorage.setItem(STORAGE_KEYS.refresh, loginData.data.refreshToken);
-        localStorage.setItem(STORAGE_KEYS.tenant, tenantId);
-        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.data.user));
-
-        document.getElementById('step2').classList.add('hidden');
-        document.getElementById('step-success').classList.remove('hidden');
-        setTimeout(() => window.location.href = '/dashboard.html', 2000);
-
       } catch (err) {
-        showError('error2', err.message || '初始化失败，请重试');
+        showError('error2', err.message || '初始化失败，请稍后重试');
         btn.disabled = false;
         btn.innerHTML = '完成初始化';
       }

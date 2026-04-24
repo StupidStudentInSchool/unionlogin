@@ -196,8 +196,15 @@ export class AuditService {
   private client = getSupabaseClient();
 
   async create(data: any): Promise<void> {
-    const { error } = await this.client.from('audit_logs').insert(data);
-    if (error) throw new Error(`创建审计日志失败: ${error.message}`);
+    try {
+      const { error } = await this.client.from('audit_logs').insert(data);
+      if (error) {
+        console.warn('审计日志记录失败:', error.message);
+      }
+    } catch (err) {
+      // 静默失败，不影响主流程
+      console.warn('审计日志记录异常:', err);
+    }
   }
 
   async query(params: {

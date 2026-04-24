@@ -13,6 +13,7 @@ import { AuditController } from './modules/audit/audit.controller';
 import { AuditModule } from './modules/audit/audit.module';
 import { TenantController } from './modules/tenant/tenant.controller';
 import { TenantModule } from './modules/tenant/tenant.module';
+import { InitController } from './modules/init/init.controller';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
@@ -34,6 +35,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     ThirdPartyController,
     AuditController,
     TenantController,
+    InitController,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
