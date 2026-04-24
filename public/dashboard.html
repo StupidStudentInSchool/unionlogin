@@ -217,27 +217,35 @@
 
     async function loadApps() {
       try {
+        console.log('[DEBUG] loadApps called');
         const res = await fetch(`${API}/api/apps`, { headers: getHeaders() });
+        console.log('[DEBUG] response status:', res.status);
         const data = await res.json();
-        // 处理 TransformInterceptor 包装的响应格式
-        apps = data.data?.apps || data.apps || [];
+        console.log('[DEBUG] response data:', data);
+        // 处理 TransformInterceptor 包装的响应格式：data.data 是数组
+        apps = Array.isArray(data.data) ? data.data : (data.data?.apps || []);
+        console.log('[DEBUG] parsed apps:', apps);
         document.getElementById('stat-apps').textContent = apps.length;
         renderApps();
       } catch (err) {
-        console.error('加载应用失败', err);
+        console.error('[ERROR] 加载应用失败', err);
       }
     }
 
     async function loadUsers() {
       try {
+        console.log('[DEBUG] loadUsers called');
         const res = await fetch(`${API}/api/users`, { headers: getHeaders() });
+        console.log('[DEBUG] response status:', res.status);
         const data = await res.json();
+        console.log('[DEBUG] response data:', data);
         // 处理 TransformInterceptor 包装的响应格式
-        users = data.data?.users || data.users || [];
+        users = data.data?.list || data.data || [];
+        console.log('[DEBUG] parsed users:', users);
         document.getElementById('stat-users').textContent = users.length;
         renderUsers();
       } catch (err) {
-        console.error('加载用户失败', err);
+        console.error('[ERROR] 加载用户失败', err);
       }
     }
 
