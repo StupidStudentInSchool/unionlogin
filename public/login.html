@@ -120,14 +120,13 @@
     async function loadTenants() {
       const res = await fetch(`${API}/api/tenants`);
       const data = await res.json();
-      if (data.tenants) {
-        data.tenants.forEach(t => {
-          const opt = document.createElement('option');
-          opt.value = t.id;
-          opt.textContent = `${t.name} (${t.slug})`;
-          document.getElementById('tenant').appendChild(opt);
-        });
-      }
+      const tenants = data.data || [];
+      tenants.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = `${t.name} (${t.slug})`;
+        document.getElementById('tenant').appendChild(opt);
+      });
     }
 
     document.getElementById('form').addEventListener('submit', async (e) => {
@@ -147,15 +146,16 @@
           body: JSON.stringify({ login: username, password }),
         });
         const data = await res.json();
+        const loginData = data.data || {};
 
-        if (data.accessToken) {
-          localStorage.setItem(STORAGE_KEYS.token, data.accessToken);
-          localStorage.setItem(STORAGE_KEYS.refresh, data.refreshToken);
+        if (loginData.accessToken) {
+          localStorage.setItem(STORAGE_KEYS.token, loginData.accessToken);
+          localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken);
           localStorage.setItem(STORAGE_KEYS.tenant, tenantId);
-          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(data.user));
+          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user));
           window.location.href = '/dashboard.html';
         } else {
-          showError(data.message || '登录失败');
+          showError(data.message || data.data?.message || '登录失败');
         }
       } catch (err) {
         showError('登录失败，请稍后重试');

@@ -225,7 +225,8 @@
       try {
         const res = await fetch(`${API}/api/tenants?slug=${slug}`);
         const data = await res.json();
-        if (data.tenants && data.tenants.some(t => t.slug === slug)) {
+        const tenants = data.data || [];
+        if (tenants.some && tenants.some(t => t.slug === slug)) {
           status.textContent = '该标识已被使用，请换一个';
           status.className = 'mt-1.5 text-xs text-red-500';
           return false;
@@ -318,36 +319,42 @@
           body: JSON.stringify({ name: tenantName, slug: tenantSlug }),
         });
         const tenantData = await tenantRes.json();
-        if (!tenantData.id) {
+        const tenantId = tenantData.data?.id;
+        if (!tenantId) {
           // 可能是 slug 重复，检查错误信息
-          if (tenantData.message && tenantData.message.includes('unique')) {
+          const msg = tenantData.message || tenantData.data?.message || '';
+          if (msg.includes('unique') || msg.includes('已被使用')) {
             throw new Error('该租户标识已被使用，请换一个');
           }
-          throw new Error(tenantData.message || '创建租户失败');
+          throw new Error(msg || '创建租户失败');
         }
 
         // 2. 注册用户
         const userRes = await fetch(`${API}/api/users/register`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantData.id },
+          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
           body: JSON.stringify({ username, email, password }),
         });
         const userData = await userRes.json();
-        if (!userData.id) throw new Error(userData.message || '创建用户失败');
+        if (!userData.data?.id) {
+          throw new Error(userData.message || userData.data?.message || '创建用户失败');
+        }
 
         // 3. 登录
         const loginRes = await fetch(`${API}/api/users/login`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantData.id },
+          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
           body: JSON.stringify({ login: username, password }),
         });
         const loginData = await loginRes.json();
-        if (!loginData.accessToken) throw new Error('登录失败');
+        if (!loginData.data?.accessToken) {
+          throw new Error(loginData.message || '登录失败');
+        }
 
-        localStorage.setItem(STORAGE_KEYS.token, loginData.accessToken);
-        localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken);
-        localStorage.setItem(STORAGE_KEYS.tenant, tenantData.id);
-        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user));
+        localStorage.setItem(STORAGE_KEYS.token, loginData.data.accessToken);
+        localStorage.setItem(STORAGE_KEYS.refresh, loginData.data.refreshToken);
+        localStorage.setItem(STORAGE_KEYS.tenant, tenantId);
+        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.data.user));
 
         document.getElementById('step2').classList.add('hidden');
         document.getElementById('step-success').classList.remove('hidden');
