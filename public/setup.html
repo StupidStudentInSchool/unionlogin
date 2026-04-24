@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>初始设置 - Identity Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.cn">
+  <link rel="preconnect" href="https://fonts.gstatic.cn" crossorigin>
+  <link href="https://fonts.googleapis.cn/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        },
+      },
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="min-h-screen flex">
+  <!-- 左侧品牌 -->
+  <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 p-12 flex-col justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+      </div>
+      <span class="text-2xl font-bold text-white">Identity Center</span>
+    </div>
+    <div class="space-y-6">
+      <h1 class="text-5xl font-bold text-white leading-tight">统一身份认证中心</h1>
+      <p class="text-xl text-white/80 leading-relaxed">为您的应用提供安全、可靠的用户认证服务</p>
+      <div class="space-y-4 pt-4">
+        ${['企业级安全标准', '统一用户管理', '第三方登录集成', '多租户支持'].map(f => `
+          <div class="flex items-center gap-3 text-white/90">
+            <div class="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <span>${f}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="text-white/60 text-sm">© 2024 Identity Center</div>
+  </div>
+
+  <!-- 右侧表单 -->
+  <div class="flex-1 flex items-center justify-center p-8 bg-gray-50">
+    <div class="w-full max-w-md">
+      <!-- 移动端 Logo -->
+      <div class="lg:hidden flex items-center justify-center gap-3 mb-8">
+        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        </div>
+        <span class="text-xl font-bold text-gray-800">Identity Center</span>
+      </div>
+
+      <!-- 步骤指示器 -->
+      <div class="flex items-center justify-center gap-2 mb-8">
+        <div class="flex items-center gap-2">
+          <div id="step1-dot" class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-medium transition-colors">1</div>
+          <span class="text-sm font-medium text-gray-800">管理员</span>
+        </div>
+        <div id="step-line" class="w-12 h-0.5 bg-gray-200 transition-colors"></div>
+        <div class="flex items-center gap-2">
+          <div id="step2-dot" class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-medium transition-colors">2</div>
+          <span id="step2-label" class="text-sm font-medium text-gray-400 transition-colors">租户</span>
+        </div>
+      </div>
+
+      <!-- 步骤1: 创建管理员 -->
+      <div id="step1" class="bg-white rounded-2xl shadow-lg p-8 animate-fade-in">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">创建管理员账号</h2>
+        <p class="text-gray-500 mb-6">设置系统管理员的登录凭证</p>
+        <div id="error1" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm"></div>
+        <form id="form1" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
+            <input type="text" id="username" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="输入用户名">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">邮箱</label>
+            <input type="email" id="email" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="admin@example.com">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
+            <input type="password" id="password" required minlength="8" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="至少8个字符">
+            <div id="strength" class="flex gap-1 mt-2">
+              <div class="h-1 flex-1 rounded-full bg-gray-200"></div>
+              <div class="h-1 flex-1 rounded-full bg-gray-200"></div>
+              <div class="h-1 flex-1 rounded-full bg-gray-200"></div>
+              <div class="h-1 flex-1 rounded-full bg-gray-200"></div>
+            </div>
+            <p id="strength-text" class="text-xs text-gray-400 mt-1"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">确认密码</label>
+            <input type="password" id="confirm" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="再次输入密码">
+          </div>
+          <button type="submit" class="w-full mt-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
+            下一步
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+
+      <!-- 步骤2: 配置租户 -->
+      <div id="step2" class="hidden bg-white rounded-2xl shadow-lg p-8 animate-fade-in">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">配置租户信息</h2>
+        <p class="text-gray-500 mb-6">设置您的组织或公司信息</p>
+        <div id="error2" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm"></div>
+        <form id="form2" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">租户名称</label>
+            <input type="text" id="tenant-name" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="我的公司">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">租户标识</label>
+            <input type="text" id="tenant-slug" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" placeholder="my-company">
+            <p class="mt-1.5 text-xs text-gray-400">用于 API 调用时的租户标识</p>
+          </div>
+          <div class="mt-6 p-4 bg-gray-50 rounded-xl">
+            <h3 class="text-sm font-medium text-gray-700 mb-3">即将创建:</h3>
+            <div class="space-y-2 text-sm text-gray-600">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>管理员: <span id="summary-user">-</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>邮箱: <span id="summary-email">-</span></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>租户: <span id="summary-tenant">-</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="button" id="btn-back" class="flex-1 py-3.5 border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors">
+              返回
+            </button>
+            <button type="submit" id="btn-finish" class="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
+              完成初始化
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 成功页 -->
+      <div id="step-success" class="hidden bg-white rounded-2xl shadow-lg p-8 text-center animate-fade-in">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">初始化完成!</h2>
+        <p class="text-gray-600 mb-4">正在跳转到管理后台...</p>
+        <div class="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    const STORAGE_KEYS = { token: 'idc_access_token', refresh: 'idc_refresh_token', tenant: 'idc_tenant_id', user: 'idc_user' };
+
+    // 密码强度检测
+    document.getElementById('password').addEventListener('input', (e) => {
+      const pwd = e.target.value;
+      const checks = [
+        { label: '8+字符', pass: pwd.length >= 8 },
+        { label: '大写字母', pass: /[A-Z]/.test(pwd) },
+        { label: '小写字母', pass: /[a-z]/.test(pwd) },
+        { label: '数字', pass: /[0-9]/.test(pwd) },
+      ];
+      const strength = checks.filter(c => c.pass).length;
+      const colors = ['bg-gray-200', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'];
+      const bars = document.querySelectorAll('#strength > div');
+      bars.forEach((bar, i) => {
+        bar.className = `h-1 flex-1 rounded-full transition-colors ${i < strength ? colors[strength] : 'bg-gray-200'}`;
+      });
+      const text = checks.filter(c => c.pass).map(c => c.label).join(', ');
+      document.getElementById('strength-text').textContent = text;
+    });
+
+    // 自动生成 slug
+    document.getElementById('tenant-name').addEventListener('input', (e) => {
+      const slug = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+      document.getElementById('tenant-slug').value = slug;
+    });
+
+    // 步骤1提交
+    document.getElementById('form1').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('confirm').value;
+
+      if (password.length < 8) {
+        showError('error1', '密码至少8个字符');
+        return;
+      }
+      if (password !== confirm) {
+        showError('error1', '两次输入的密码不一致');
+        return;
+      }
+
+      // 切换到步骤2
+      document.getElementById('step1').classList.add('hidden');
+      document.getElementById('step2').classList.remove('hidden');
+      document.getElementById('step1-dot').classList.remove('bg-indigo-600');
+      document.getElementById('step1-dot').classList.add('bg-green-500');
+      document.getElementById('step1-dot').innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+      document.getElementById('step2-dot').classList.remove('bg-gray-200', 'text-gray-500');
+      document.getElementById('step2-dot').classList.add('bg-indigo-600', 'text-white');
+      document.getElementById('step-line').classList.remove('bg-gray-200');
+      document.getElementById('step-line').classList.add('bg-indigo-500');
+      document.getElementById('step2-label').classList.remove('text-gray-400');
+      document.getElementById('step2-label').classList.add('text-gray-800');
+
+      // 更新摘要
+      document.getElementById('summary-user').textContent = document.getElementById('username').value;
+      document.getElementById('summary-email').textContent = document.getElementById('email').value;
+    });
+
+    // 返回步骤1
+    document.getElementById('btn-back').addEventListener('click', () => {
+      document.getElementById('step2').classList.add('hidden');
+      document.getElementById('step1').classList.remove('hidden');
+      document.getElementById('step1-dot').classList.add('bg-indigo-600');
+      document.getElementById('step1-dot').classList.remove('bg-green-500');
+      document.getElementById('step1-dot').innerHTML = '1';
+      document.getElementById('step2-dot').classList.add('bg-gray-200', 'text-gray-500');
+      document.getElementById('step2-dot').classList.remove('bg-indigo-600', 'text-white');
+      document.getElementById('step-line').classList.add('bg-gray-200');
+      document.getElementById('step-line').classList.remove('bg-indigo-500');
+      document.getElementById('step2-label').classList.add('text-gray-400');
+      document.getElementById('step2-label').classList.remove('text-gray-800');
+    });
+
+    // 完成初始化
+    document.getElementById('form2').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-finish');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> 初始化中...';
+
+      const username = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const tenantName = document.getElementById('tenant-name').value;
+      const tenantSlug = document.getElementById('tenant-slug').value;
+
+      try {
+        // 1. 创建租户
+        const tenantRes = await fetch(`${API}/api/tenants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: tenantName, slug: tenantSlug }),
+        });
+        const tenantData = await tenantRes.json();
+        if (!tenantData.id) throw new Error(tenantData.message || '创建租户失败');
+
+        // 2. 注册用户
+        const userRes = await fetch(`${API}/api/users/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantData.id },
+          body: JSON.stringify({ username, email, password }),
+        });
+        const userData = await userRes.json();
+        if (!userData.id) throw new Error(userData.message || '创建用户失败');
+
+        // 3. 登录
+        const loginRes = await fetch(`${API}/api/users/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantData.id },
+          body: JSON.stringify({ login: username, password }),
+        });
+        const loginData = await loginRes.json();
+        if (!loginData.accessToken) throw new Error('登录失败');
+
+        localStorage.setItem(STORAGE_KEYS.token, loginData.accessToken);
+        localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken);
+        localStorage.setItem(STORAGE_KEYS.tenant, tenantData.id);
+        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user));
+
+        document.getElementById('step2').classList.add('hidden');
+        document.getElementById('step-success').classList.remove('hidden');
+        setTimeout(() => window.location.href = '/dashboard.html', 2000);
+
+      } catch (err) {
+        showError('error2', err.message || '初始化失败，请重试');
+        btn.disabled = false;
+        btn.innerHTML = '完成初始化';
+      }
+    });
+
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 5000);
+    }
+  </script>
+</body>
+</html>

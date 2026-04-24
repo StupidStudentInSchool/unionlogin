@@ -119,6 +119,30 @@ if (error) throw new Error(`查询失败: ${error.message}`);
 3. API 使用 Bearer Token 认证
 4. 实施 CSRF 防护（state 参数）
 
+## 前端页面
+
+静态 HTML 页面位于 `public/` 目录：
+
+| 页面 | 路径 | 说明 |
+|------|------|------|
+| 首页 | `/` | 自动重定向到 setup 或 login |
+| 初始设置 | `/setup.html` | 首次登录创建管理员和租户 |
+| 登录 | `/login.html` | 用户登录页面 |
+| 管理后台 | `/dashboard.html` | 应用和用户管理 |
+
+### 页面流程
+
+1. **首次访问** → `/setup.html` → 创建管理员和租户 → 跳转 `/dashboard.html`
+2. **已有账号** → `/login.html` → 登录 → 跳转 `/dashboard.html`
+
+### 技术特点
+
+- 使用 Tailwind CSS CDN（开发环境）
+- 响应式设计，支持移动端和桌面端
+- OAuth 2.0 第三方登录按钮（GitHub, Google）
+- 密码强度实时检测
+- JWT Token 本地存储
+
 ## 注意事项
 
 - 多租户模式：请求 Header 中添加 `X-Tenant-Id`
