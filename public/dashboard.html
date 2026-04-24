@@ -187,11 +187,16 @@
     let users = [];
 
     function getHeaders() {
-      return {
+      const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
+      const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.token)}`,
-        'x-tenant-id': localStorage.getItem(STORAGE_KEYS.tenant),
       };
+      // 只有 tenant 有效时才添加 header
+      if (tenant && tenant !== 'null' && tenant !== 'undefined') {
+        headers['x-tenant-id'] = tenant;
+      }
+      return headers;
     }
 
     async function init() {

@@ -117,8 +117,8 @@ export class OAuthClientService {
 
   async findAll(tenantId?: string): Promise<OAuthClient[]> {
     let query = this.client.from('oauth_clients').select('*').order('created_at', { ascending: false });
-    // 只有当 tenantId 有效（不是 'default' 且不是 undefined）时才过滤
-    if (tenantId && tenantId !== 'default') {
+    // 只有当 tenantId 有效（不是 'default'、'null'、'undefined' 且不是 undefined）时才过滤
+    if (tenantId && tenantId !== 'default' && tenantId !== 'null' && tenantId !== 'undefined') {
       query = query.eq('tenant_id', tenantId);
     }
     const { data, error } = await query;
