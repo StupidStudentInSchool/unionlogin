@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { tenantService } from './tenant.module';
 import { Public } from '../../common/decorators/auth.decorator';
@@ -14,10 +14,13 @@ export class TenantController {
     return tenantService.create(body);
   }
 
-  @UseGuards(AuthGuard)
+  @Public()
   @Get()
   @ApiOperation({ summary: '获取租户列表' })
-  async getTenants() {
+  async getTenants(@Query('slug') slug?: string) {
+    if (slug) {
+      return tenantService.findBySlug(slug);
+    }
     return tenantService.findAll();
   }
 
