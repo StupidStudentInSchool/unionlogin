@@ -1,47 +1,29 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { TenantMiddleware } from './common/middleware/tenant.middleware';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  const configService = app.get(ConfigService);
-  
-  // 全局前缀
-  app.setGlobalPrefix('api');
-  
-  // 全局验证管道
+  // 全局管道
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
+      whitelist: true,
     }),
   );
-  
+
   // 全局异常过滤器
-  app.useGlobalFilters(new HttpExceptionFilter());
-  
-  // 全局响应拦截器
-  app.useGlobalInterceptors(new TransformInterceptor());
-  
-  // CORS 配置
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // CORS
   app.enableCors({
-    origin: configService.get<string>('app.frontendUrl', 'http://localhost:3000'),
+    origin: true,
     credentials: true,
   });
-  
-  // 租户中间件
-  app.use(new TenantMiddleware(configService).use.bind(TenantMiddleware));
-  
+
   // Swagger 文档
   const config = new DocumentBuilder()
     .setTitle('Identity Center API')
@@ -50,14 +32,12 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
-  
-  const port = configService.get<number>('app.port') || 5000;
-  const host = configService.get<string>('app.host') || '0.0.0.0';
-  
-  await app.listen(port, host);
-  console.log(`Identity Center is running on: http://${host}:${port}`);
-  console.log(`Swagger docs: http://${host}:${port}/api/docs`);
+  SwaggerModule.setup('api/docs', app, document);
+
+  const port = process.env.APP_PORT || 5000;
+  await app.listen(port);
+  console.log(`Identity Center is running on http://0.0.0.0:${port}`);
+  console.log(`Swagger UI: http://0.0.0.0:${port}/api/docs`);
 }
 
 bootstrap();

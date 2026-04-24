@@ -7,8 +7,7 @@
 ## 技术栈
 
 - **框架**: NestJS 11 + TypeScript
-- **数据库**: MySQL 8.0 + TypeORM
-- **缓存**: Redis (ioredis)
+- **数据库**: Coze Supabase (PostgreSQL)
 - **认证协议**: OAuth 2.0 Authorization Code Flow
 - **第三方登录**: GitHub, Google, 微信
 
@@ -16,35 +15,43 @@
 
 ```
 src/
-├── config/                 # 配置模块
-│   ├── configuration.ts     # 环境变量配置
-│   ├── config.module.ts     # 配置模块定义
-│   └── redis.service.ts     # Redis 服务
-├── common/                 # 公共模块
-│   ├── decorators/          # 装饰器 (@Public, @CurrentUser, @TenantId)
-│   ├── guards/              # 守卫 (AuthGuard)
-│   ├── filters/             # 异常过滤器
-│   ├── interceptors/       # 响应拦截器
-│   └── middleware/          # 中间件 (TenantMiddleware)
-├── database/
-│   ├── entities/            # 数据库实体
-│   │   ├── user.entity.ts
-│   │   ├── oauth-client.entity.ts
-│   │   ├── user-authorization.entity.ts
-│   │   ├── audit-log.entity.ts
-│   │   ├── user-session.entity.ts
-│   │   ├── tenant.entity.ts
-│   │   └── third-party-account.entity.ts
-│   └── init.ts              # 数据库初始化脚本
+├── storage/database/         # 数据库层 (Supabase)
+│   ├── supabase-client.ts    # Supabase 客户端
+│   ├── services.ts           # 数据库服务层
+│   └── shared/schema.ts      # 数据模型定义
 ├── modules/
 │   ├── auth/                # OAuth 2.0 认证模块
+│   │   ├── auth.service.ts
+│   │   ├── auth.controller.ts
+│   │   └── dto/oauth.dto.ts
 │   ├── users/               # 用户管理模块
 │   ├── apps/                # 应用管理模块
-│   ├── audit/               # 审计日志模块
 │   ├── third-party/         # 第三方登录模块
+│   ├── audit/               # 审计日志模块
 │   └── tenant/              # 多租户模块
-└── main.ts                  # 应用入口
+└── common/                  # 公共模块
+    ├── decorators/
+    ├── guards/
+    ├── filters/
+    ├── interceptors/
+    └── middleware/
 ```
+
+## 数据库表
+
+| 表名 | 说明 |
+|------|------|
+| tenants | 租户表 |
+| users | 用户表 |
+| oauth_clients | OAuth 客户端表 |
+| user_authorizations | 授权记录表 |
+| user_sessions | 用户会话表 |
+| audit_logs | 审计日志表 |
+| third_party_accounts | 第三方账户表 |
+
+## API 文档
+
+- Swagger UI: http://localhost:5000/api/docs
 
 ## 常用命令
 
@@ -60,38 +67,19 @@ pnpm build
 
 # 生产运行
 pnpm start:prod
-
-# 运行测试
-pnpm test
-
-# 初始化数据库
-pnpm ts-node src/database/init.ts
-
-# TypeORM 迁移
-pnpm migration:generate src/database/migrations/MigrationName
-pnpm migration:run
 ```
 
 ## 环境变量
 
-必需的环境变量（.env）：
+可选环境变量（使用 Coze Supabase 时自动配置）：
 
 ```env
-# 数据库
-DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=root123
-DB_NAME=identity_center
+# Coze 平台自动注入
+COZE_SUPABASE_URL=
+COZE_SUPABASE_ANON_KEY=
+COZE_SUPABASE_SERVICE_ROLE_KEY=
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# JWT
-JWT_SECRET=your-secret-key
-
-# 应用
+# 应用配置
 APP_PORT=5000
 FRONTEND_URL=http://localhost:3000
 
@@ -104,32 +92,25 @@ WECHAT_APP_ID=
 WECHAT_APP_SECRET=
 ```
 
-## API 文档
-
-- Swagger UI: http://localhost:5000/api/docs
-
-## 默认账户
-
-- 用户名: `admin`
-- 密码: `admin123`
-
 ## 开发规范
 
-### 模块创建
+### Supabase SDK 使用
 
-每个模块应包含：
-1. `*.module.ts` - 模块定义
-2. `*.controller.ts` - 控制器
-3. `*.service.ts` - 服务
-4. `dto/*.ts` - 数据传输对象
-5. `entities/*.ts` - 数据库实体（如需要）
+```typescript
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
-### 命名规范
+// 服务端操作（绕过 RLS）
+const client = getSupabaseClient();
 
-- 文件名: kebab-case (如 `user.service.ts`)
-- 类名: PascalCase (如 `UserService`)
-- 方法名: camelCase (如 `findById`)
-- 数据库表名: snake_case (如 `user_authorizations`)
+// CRUD 操作
+const { data, error } = await client.from('users').select('*').eq('id', userId);
+if (error) throw new Error(`查询失败: ${error.message}`);
+```
+
+### 数据库表命名
+
+- 表名：snake_case（如 `user_sessions`）
+- 字段名：snake_case（如 `created_at`）
 
 ### 安全规范
 
@@ -141,5 +122,5 @@ WECHAT_APP_SECRET=
 ## 注意事项
 
 - 多租户模式：请求 Header 中添加 `X-Tenant-Id`
-- Token 存储在 Redis 中，默认 Access Token 1小时过期，Refresh Token 7天过期
+- Token 存储在数据库中，默认 Access Token 1小时过期，Refresh Token 7天过期
 - 授权码有效期 5 分钟，一次性使用

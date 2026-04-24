@@ -1,52 +1,81 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { AppsService } from './apps.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  Query,
+} from '@nestjs/common';
+import type { Request } from 'express';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { appsService } from './apps.service';
+import { Public, CurrentUser } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
-import { TenantId, ApiTenantQuery } from '../../common/decorators/auth.decorator';
-import { CreateAppDto, UpdateAppDto, AppResponseDto, AppWithSecretDto } from './dto/app.dto';
 
 @ApiTags('应用管理')
 @Controller('apps')
-@ApiBearerAuth()
-@UseGuards(AuthGuard)
 export class AppsController {
-  constructor(private readonly appsService: AppsService) {}
-
+  @UseGuards(AuthGuard)
   @Post()
   @ApiOperation({ summary: '创建应用' })
-  @ApiTenantQuery()
-  @ApiResponse({ status: 201, description: '创建成功', type: AppWithSecretDto })
-  async create(@Body() dto: CreateAppDto, @TenantId() tenantId?: string) {
-    return this.appsService.create(dto, tenantId);
+  async createApp(
+    @Body() body: { name: string; redirectUris: string[]; scopes?: string[] },
+    @Req() req: Request,
+  ) {
+    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    const result = await appsService.createApp({ ...body, tenantId });
+    
+    return {
+      app: {
+        id: result.app.id,
+        name: result.app.name,
+        client_id: result.app.client_id,
+        redirect_uris: result.app.redirect_uris,
+        scopes: result.app.scopes,
+        status: result.app.status,
+        created_at: result.app.created_at,
+      },
+      clientSecret: result.clientSecret,
+    };
   }
 
+  @UseGuards(AuthGuard)
   @Get()
   @ApiOperation({ summary: '获取应用列表' })
-  @ApiTenantQuery()
-  @ApiResponse({ status: 200, description: '应用列表', type: [AppResponseDto] })
-  async findAll(@TenantId() tenantId?: string) {
-    return this.appsService.findAll(tenantId);
+  async getApps(@Req() req: Request) {
+    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    return appsService.getApps(tenantId);
   }
 
-  @Get(':id')
+  @Public()
+  @Get(':clientId')
   @ApiOperation({ summary: '获取应用详情' })
-  @ApiResponse({ status: 200, description: '应用详情', type: AppResponseDto })
-  async findOne(@Param('id') id: string) {
-    return this.appsService.findById(id);
+  async getApp(@Param('clientId') clientId: string) {
+    return appsService.getApp(clientId);
   }
 
-  @Put(':id')
+  @UseGuards(AuthGuard)
+  @Put(':clientId')
   @ApiOperation({ summary: '更新应用' })
-  @ApiResponse({ status: 200, description: '更新成功', type: AppResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateAppDto) {
-    return this.appsService.update(id, dto);
+  async updateApp(
+    @Param('clientId') clientId: string,
+    @Body() body: { name?: string; redirectUris?: string[]; scopes?: string[] },
+    @Req() req: Request,
+  ) {
+    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    return appsService.updateApp(clientId, body, tenantId);
   }
 
-  @Delete(':id')
+  @UseGuards(AuthGuard)
+  @Delete(':clientId')
   @ApiOperation({ summary: '删除应用' })
-  @ApiResponse({ status: 200, description: '删除成功' })
-  async remove(@Param('id') id: string) {
-    await this.appsService.delete(id);
-    return { message: '应用已删除' };
+  async deleteApp(@Param('clientId') clientId: string, @Req() req: Request) {
+    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    await appsService.deleteApp(clientId, tenantId);
+    return { success: true };
   }
 }

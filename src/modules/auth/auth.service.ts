@@ -1,274 +1,177 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-  Logger,
-  forwardRef,
-  Inject,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
-import { User } from '../../database/entities/user.entity';
-import { OAuthClient } from '../../database/entities/oauth-client.entity';
-import { UserAuthorization } from '../../database/entities/user-authorization.entity';
-import { RedisService } from '../../config/redis.service';
-import { AuditService } from '../audit/audit.service';
-import { AuditEventType } from '../../database/entities/audit-log.entity';
-import { UsersService } from '../users/users.service';
-import { AppsService } from '../apps/apps.service';
-import {
-  AuthorizeDto,
-  TokenRequestDto,
-  TokenResponseDto,
-  UserInfoResponseDto,
-  IntrospectResponseDto,
-} from './dto/oauth.dto';
+import { getSupabaseClient } from '../../storage/database/supabase-client';
+import { userService, oauthClientService, sessionService, auditService } from '../../storage/database/services';
+import type { User, OAuthClient, UserSession } from '../../storage/database/shared/schema';
 
-@Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
+  private client = getSupabaseClient();
 
-  constructor(
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    @InjectRepository(OAuthClient)
-    private clientRepository: Repository<OAuthClient>,
-    @InjectRepository(UserAuthorization)
-    private authRepository: Repository<UserAuthorization>,
-    private redisService: RedisService,
-    private configService: ConfigService,
-    @Inject(forwardRef(() => AuditService))
-    private auditService: AuditService,
-    @Inject(forwardRef(() => UsersService))
-    private usersService: UsersService,
-    @Inject(forwardRef(() => AppsService))
-    private appsService: AppsService,
-  ) {}
-
+  // 生成授权码（简化版，实际应用中需要存储到缓存中并设置过期时间）
   async generateAuthorizationCode(
-    dto: AuthorizeDto,
+    clientId: string,
+    redirectUri: string,
     userId: string,
-    ipAddress?: string,
-    userAgent?: string,
+    scopes: string[],
   ): Promise<{ code: string; state?: string }> {
-    const client = await this.appsService.validateClient(dto.clientId);
+    const code = crypto.randomBytes(32).toString('hex');
+    const state = crypto.randomBytes(16).toString('hex');
     
-    const isValidUri = await this.appsService.validateRedirectUri(dto.clientId, dto.redirectUri);
-    if (!isValidUri) {
-      throw new BadRequestException('重定向 URI 不在允许列表中');
-    }
-
-    const scopes = await this.appsService.validateScopes(dto.clientId, dto.scope || []);
-
-    const code = crypto.randomBytes(32).toString('base64url');
-    const codeExpireSeconds = this.configService.get<number>('oauth.authorizationCodeExpire') || 300;
-
-    await this.redisService.setAuthorizationCode(
-      code,
-      {
-        clientId: dto.clientId,
-        userId,
-        redirectUri: dto.redirectUri,
-        scopes,
-        state: dto.state,
-      },
-      codeExpireSeconds,
-    );
-
-    if (this.auditService) {
-      this.auditService.createLog({
-        eventType: AuditEventType.OAUTH_AUTHORIZE,
-        userId,
-        clientId: client.id,
-        ipAddress,
-        userAgent,
-        requestParams: { clientId: dto.clientId, scopes },
-        responseStatus: 200,
-      }).catch(console.error);
-    }
-
-    return { code, state: dto.state };
-  }
-
-  async exchangeCodeForToken(
-    dto: TokenRequestDto,
-    ipAddress?: string,
-    userAgent?: string,
-  ): Promise<TokenResponseDto> {
-    const codeData = await this.redisService.getAuthorizationCode(dto.code || '');
-    if (!codeData) {
-      throw new UnauthorizedException('授权码已过期或无效');
-    }
-
-    await this.appsService.validateClient(dto.clientId, dto.clientSecret);
-
-    if (codeData.redirectUri !== dto.redirectUri) {
-      throw new BadRequestException('重定向 URI 不匹配');
-    }
-
-    await this.redisService.revokeAuthorizationCode(dto.code || '');
-
-    const userId = codeData.userId;
-    const tokenResponse = await this.generateTokens(userId, dto.clientId, codeData.scopes);
-
-    if (this.auditService) {
-      this.auditService.createLog({
-        eventType: AuditEventType.OAUTH_TOKEN,
-        userId,
-        clientId: codeData.clientId,
-        ipAddress,
-        userAgent,
-        requestParams: { grantType: 'authorization_code' },
-        responseStatus: 200,
-      }).catch(console.error);
-    }
-
-    return tokenResponse;
-  }
-
-  async refreshAccessToken(
-    dto: TokenRequestDto,
-    ipAddress?: string,
-    userAgent?: string,
-  ): Promise<TokenResponseDto> {
-    const userId = await this.redisService.getRefreshToken(dto.refreshToken || '');
-    if (!userId) {
-      throw new UnauthorizedException('Refresh Token 已过期或无效');
-    }
-
-    const user = await this.usersService.findById(userId);
-    if (!user) {
-      throw new UnauthorizedException('用户不存在');
-    }
-
-    const auth = await this.authRepository.findOne({
-      where: { userId, clientId: dto.clientId },
+    // 将授权码存入缓存（5分钟过期）
+    const codeData = JSON.stringify({ clientId, redirectUri, userId, scopes });
+    await sessionService.create({
+      user_id: userId,
+      access_token: `code_${code}`,
+      refresh_token: codeData,
+      ip_address: '',
+      user_agent: '',
+      expires_at: new Date(Date.now() + 5 * 60 * 1000),
     });
 
-    const scopes = auth?.scopes || ['openid', 'profile', 'email'];
-
-    if (this.auditService) {
-      this.auditService.createLog({
-        eventType: AuditEventType.TOKEN_REFRESH,
-        userId,
-        clientId: dto.clientId,
-        ipAddress,
-        userAgent,
-        responseStatus: 200,
-      }).catch(console.error);
-    }
-
-    return this.generateTokens(userId, dto.clientId, scopes);
+    return { code, state };
   }
 
-  async getUserInfo(accessToken: string): Promise<UserInfoResponseDto> {
-    const userId = await this.redisService.getAccessToken(accessToken);
-    if (!userId) {
-      throw new UnauthorizedException('Access Token 已过期或无效');
+  // 验证授权码并颁发 Token
+  async exchangeCodeForToken(code: string, clientId: string, redirectUri: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    tokenType: string;
+  }> {
+    // 查找授权码会话
+    const session = await sessionService.findByAccessToken(`code_${code}`);
+    
+    if (!session) {
+      throw new Error('无效的授权码');
     }
 
-    const user = await this.usersService.findById(userId);
-    if (!user) {
-      throw new UnauthorizedException('用户不存在');
+    const codeData = JSON.parse(session.refresh_token || '{}');
+    if (codeData.clientId !== clientId || codeData.redirectUri !== redirectUri) {
+      throw new Error('授权码验证失败');
     }
+
+    // 删除授权码
+    await this.client.from('user_sessions').delete().eq('access_token', `code_${code}`);
+
+    // 生成 Access Token 和 Refresh Token
+    const accessToken = `at_${crypto.randomUUID()}`;
+    const refreshToken = `rt_${crypto.randomUUID()}`;
+    const expiresIn = 3600; // 1小时
+    const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+    // 创建会话
+    await sessionService.create({
+      user_id: codeData.userId,
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      ip_address: '',
+      user_agent: '',
+      expires_at: expiresAt,
+    });
+
+    // 记录审计日志
+    await auditService.create({
+      event_type: 'oauth_token',
+      user_id: codeData.userId,
+      client_id: clientId,
+    });
 
     return {
-      sub: user.id,
-      username: user.username,
-      email: user.email,
-      emailVerified: user.emailVerified,
-      nickname: user.nickname,
-      picture: user.avatarUrl,
-      updatedAt: Math.floor(user.updatedAt.getTime() / 1000),
+      accessToken,
+      refreshToken,
+      expiresIn,
+      tokenType: 'Bearer',
     };
   }
 
-  async introspectToken(token: string): Promise<IntrospectResponseDto> {
-    const userId = await this.redisService.getAccessToken(token);
-    
-    if (!userId) {
+  // 刷新 Access Token
+  async refreshAccessToken(refreshToken: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    tokenType: string;
+  }> {
+    const session = await sessionService.findByRefreshToken(refreshToken);
+    if (!session) {
+      throw new Error('无效的 Refresh Token');
+    }
+
+    // 生成新的 Token
+    const accessToken = `at_${crypto.randomUUID()}`;
+    const newRefreshToken = `rt_${crypto.randomUUID()}`;
+    const expiresIn = 3600;
+    const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+    // 更新会话
+    await this.client.from('user_sessions').update({
+      access_token: accessToken,
+      refresh_token: newRefreshToken,
+      expires_at: expiresAt.toISOString(),
+    }).eq('refresh_token', refreshToken);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn,
+      tokenType: 'Bearer',
+    };
+  }
+
+  // 验证 Token
+  async introspectToken(accessToken: string): Promise<{ active: boolean; sub?: string; exp?: number }> {
+    const session = await sessionService.findByAccessToken(accessToken);
+    if (!session) {
       return { active: false };
     }
 
-    const user = await this.usersService.findById(userId);
-    if (!user) {
+    const expiresAt = new Date(session.expires_at);
+    if (expiresAt < new Date()) {
+      await sessionService.delete(accessToken);
       return { active: false };
     }
 
     return {
       active: true,
-      sub: user.id,
-      username: user.username,
-      exp: Math.floor(Date.now() / 1000) + 3600,
-      iat: Math.floor(Date.now() / 1000),
+      sub: session.user_id,
+      exp: expiresAt.getTime() / 1000,
     };
   }
 
-  async revokeToken(token: string): Promise<void> {
-    await this.redisService.revokeAccessToken(token);
-    await this.redisService.revokeRefreshToken(token);
-  }
-
-  async logout(accessToken: string, userId?: string, ipAddress?: string, userAgent?: string): Promise<void> {
-    await this.redisService.revokeAccessToken(accessToken);
-
-    if (userId && this.auditService) {
-      this.auditService.createLog({
-        eventType: AuditEventType.LOGOUT,
-        userId,
-        ipAddress,
-        userAgent,
-        responseStatus: 200,
-      }).catch(console.error);
-    }
-  }
-
-  private async generateTokens(
-    userId: string,
-    clientId: string,
-    scopes: string[],
-  ): Promise<TokenResponseDto> {
-    const accessTokenExpire = this.configService.get<number>('oauth.accessTokenExpire') || 3600;
-    const refreshTokenExpire = this.configService.get<number>('oauth.refreshTokenExpire') || 604800;
-
-    const accessToken = `at_${uuidv4()}`;
-    const refreshToken = `rt_${uuidv4()}`;
-
-    await this.redisService.setAccessToken(accessToken, userId, accessTokenExpire);
-    await this.redisService.setRefreshToken(refreshToken, userId, refreshTokenExpire);
-
-    let auth = await this.authRepository.findOne({
-      where: { userId, clientId },
-    });
-
-    if (!auth) {
-      auth = this.authRepository.create({
-        id: uuidv4(),
-        userId,
-        clientId,
-        scopes,
-        accessToken,
-        refreshToken,
-        tokenExpiresAt: new Date(Date.now() + accessTokenExpire * 1000),
-      });
-    } else {
-      auth.accessToken = accessToken;
-      auth.refreshToken = refreshToken;
-      auth.scopes = scopes;
-      auth.tokenExpiresAt = new Date(Date.now() + accessTokenExpire * 1000);
+  // 获取用户信息
+  async getUserInfo(accessToken: string): Promise<Partial<User>> {
+    const session = await sessionService.findByAccessToken(accessToken);
+    if (!session) {
+      throw new Error('无效的 Token');
     }
 
-    await this.authRepository.save(auth);
+    const user = await userService.findById(session.user_id);
+    if (!user) {
+      throw new Error('用户不存在');
+    }
 
     return {
-      accessToken,
-      tokenType: 'Bearer',
-      expiresIn: accessTokenExpire,
-      refreshToken,
-      scope: scopes.join(' '),
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      nickname: user.nickname,
+      avatar: user.avatar,
     };
   }
+
+  // 撤销 Token
+  async revokeToken(accessToken: string): Promise<void> {
+    await sessionService.delete(accessToken);
+  }
+
+  // 登出
+  async logout(accessToken: string, userId: string, ipAddress: string, userAgent?: string): Promise<void> {
+    await sessionService.delete(accessToken);
+    await auditService.create({
+      event_type: 'logout',
+      user_id: userId,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+    });
+  }
 }
+
+export const authService = new AuthService();

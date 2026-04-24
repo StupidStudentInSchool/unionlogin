@@ -1,140 +1,120 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
-import { OAuthClient, ClientStatus } from '../../database/entities/oauth-client.entity';
-import { CreateAppDto, UpdateAppDto, AppResponseDto, AppWithSecretDto } from './dto/app.dto';
+import { oauthClientService, auditService } from '../../storage/database/services';
+import { getSupabaseClient } from '../../storage/database/supabase-client';
+import type { OAuthClient, InsertOAuthClient } from '../../storage/database/shared/schema';
 
-@Injectable()
 export class AppsService {
-  constructor(
-    @InjectRepository(OAuthClient)
-    private clientRepository: Repository<OAuthClient>,
-  ) {}
+  // 创建应用
+  async createApp(data: {
+    name: string;
+    redirectUris: string[];
+    scopes?: string[];
+    tenantId?: string;
+  }): Promise<{ app: OAuthClient; clientSecret: string }> {
+    const clientId = crypto.randomBytes(16).toString('hex');
+    const clientSecret = crypto.randomBytes(32).toString('hex');
+    const hashedSecret = await require('bcryptjs').hash(clientSecret, 12);
 
-  async create(dto: CreateAppDto, tenantId?: string): Promise<AppWithSecretDto> {
-    // 生成 Client ID 和 Secret
-    const clientId = `app_${crypto.randomBytes(16).toString('hex')}`;
-    const clientSecret = crypto.randomBytes(32).toString('base64url');
-    const hashedSecret = await bcrypt.hash(clientSecret, 12);
+    const app = await oauthClientService.create({
+      name: data.name,
+      client_id: clientId,
+      client_secret: hashedSecret,
+      redirect_uris: data.redirectUris,
+      scopes: data.scopes || ['openid', 'profile', 'email'],
+      grant_types: ['authorization_code', 'refresh_token'],
+      tenant_id: data.tenantId,
+      status: 'active',
+    } as any);
 
-    const client = this.clientRepository.create({
-      id: uuidv4(),
-      clientId,
-      clientSecret: hashedSecret,
-      name: dto.name,
-      description: dto.description,
-      redirectUris: dto.redirectUris,
-      allowedScopes: dto.allowedScopes || ['openid', 'profile', 'email'],
-      logoUrl: dto.logoUrl,
-      tenantId,
+    return { app, clientSecret };
+  }
+
+  // 获取应用列表
+  async getApps(tenantId?: string): Promise<OAuthClient[]> {
+    return oauthClientService.findAll(tenantId);
+  }
+
+  // 获取应用详情
+  async getApp(clientId: string): Promise<OAuthClient> {
+    const app = await oauthClientService.findByClientId(clientId);
+    if (!app) {
+      throw new Error('应用不存在');
+    }
+    return app;
+  }
+
+  // 验证客户端
+  async validateClient(clientId: string, clientSecret: string, redirectUri: string): Promise<OAuthClient> {
+    const app = await oauthClientService.findByClientId(clientId);
+    if (!app) {
+      throw new Error('客户端不存在');
+    }
+
+    if (app.status !== 'active') {
+      throw new Error('客户端已被禁用');
+    }
+
+    // 验证密钥
+    const isValid = await oauthClientService.verifySecret(app, clientSecret);
+    if (!isValid) {
+      throw new Error('客户端密钥错误');
+    }
+
+    // 验证 redirect_uri
+    const validUris = app.redirect_uris as string[];
+    if (!validUris.includes(redirectUri)) {
+      throw new Error('redirect_uri 不匹配');
+    }
+
+    await auditService.create({
+      event_type: 'oauth_authorize',
+      client_id: app.id,
     });
 
-    await this.clientRepository.save(client);
-
-    return {
-      id: client.id,
-      clientId: client.clientId,
-      clientSecret, // 仅创建时返回
-      name: client.name,
-      description: client.description,
-      redirectUris: client.redirectUris,
-      allowedScopes: client.allowedScopes,
-      logoUrl: client.logoUrl,
-      status: client.status,
-      createdAt: client.createdAt,
-    };
+    return app;
   }
 
-  async findAll(tenantId?: string): Promise<AppResponseDto[]> {
-    const where = tenantId ? { tenantId } : {};
-    const clients = await this.clientRepository.find({ where });
-    return clients.map((c) => this.toAppResponse(c));
-  }
-
-  async findById(id: string): Promise<OAuthClient> {
-    const client = await this.clientRepository.findOne({ where: { id } });
-    if (!client) {
-      throw new NotFoundException('应用不存在');
-    }
-    return client;
-  }
-
-  async findByClientId(clientId: string): Promise<OAuthClient> {
-    const client = await this.clientRepository.findOne({ where: { clientId } });
-    if (!client) {
-      throw new NotFoundException('应用不存在');
-    }
-    return client;
-  }
-
-  async update(id: string, dto: UpdateAppDto): Promise<AppResponseDto> {
-    const client = await this.findById(id);
-
-    if (dto.name) client.name = dto.name;
-    if (dto.description !== undefined) client.description = dto.description;
-    if (dto.redirectUris) client.redirectUris = dto.redirectUris;
-    if (dto.allowedScopes) client.allowedScopes = dto.allowedScopes;
-    if (dto.logoUrl !== undefined) client.logoUrl = dto.logoUrl;
-    if (dto.status !== undefined) client.status = dto.status;
-
-    await this.clientRepository.save(client);
-    return this.toAppResponse(client);
-  }
-
-  async delete(id: string): Promise<void> {
-    const client = await this.findById(id);
-    await this.clientRepository.remove(client);
-  }
-
-  async validateClient(clientId: string, clientSecret?: string): Promise<OAuthClient> {
-    const client = await this.findByClientId(clientId);
-
-    if (client.status !== ClientStatus.ACTIVE) {
-      throw new BadRequestException('应用已被禁用');
+  // 删除应用
+  async deleteApp(clientId: string, tenantId?: string): Promise<void> {
+    const app = await oauthClientService.findByClientId(clientId);
+    if (!app) {
+      throw new Error('应用不存在');
     }
 
-    if (clientSecret) {
-      const isValid = await bcrypt.compare(clientSecret, client.clientSecret);
-      if (!isValid) {
-        throw new BadRequestException('应用密钥不正确');
-      }
+    if (tenantId && app.tenant_id !== tenantId) {
+      throw new Error('无权删除此应用');
     }
 
-    return client;
+    const client = getSupabaseClient();
+    await client.from('oauth_clients').delete().eq('client_id', clientId);
   }
 
-  async validateRedirectUri(clientId: string, redirectUri: string): Promise<boolean> {
-    const client = await this.findByClientId(clientId);
-    return client.redirectUris.includes(redirectUri);
-  }
+  // 更新应用
+  async updateApp(clientId: string, data: {
+    name?: string;
+    redirectUris?: string[];
+    scopes?: string[];
+  }, tenantId?: string): Promise<OAuthClient> {
+    const app = await oauthClientService.findByClientId(clientId);
+    if (!app) {
+      throw new Error('应用不存在');
+    }
 
-  async validateScopes(clientId: string, requestedScopes: string[]): Promise<string[]> {
-    const client = await this.findByClientId(clientId);
-    const allowed = client.allowedScopes || [];
+    if (tenantId && app.tenant_id !== tenantId) {
+      throw new Error('无权修改此应用');
+    }
+
+    const client = getSupabaseClient();
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (data.name) updateData.name = data.name;
+    if (data.redirectUris) updateData.redirect_uris = data.redirectUris;
+    if (data.scopes) updateData.scopes = data.scopes;
+
+    const { data: updated, error } = await client.from('oauth_clients').update(updateData).eq('client_id', clientId).select().single();
+    if (error) throw new Error(`更新应用失败: ${error.message}`);
     
-    // 如果没有请求特定范围，返回所有允许的范围
-    if (!requestedScopes || requestedScopes.length === 0) {
-      return allowed;
-    }
-
-    // 过滤只返回允许的范围
-    return requestedScopes.filter((scope) => allowed.includes(scope));
-  }
-
-  private toAppResponse(client: OAuthClient): AppResponseDto {
-    return {
-      id: client.id,
-      clientId: client.clientId,
-      name: client.name,
-      description: client.description,
-      redirectUris: client.redirectUris,
-      allowedScopes: client.allowedScopes,
-      logoUrl: client.logoUrl,
-      status: client.status,
-      createdAt: client.createdAt,
-    };
+    return updated as OAuthClient;
   }
 }
+
+export const appsService = new AppsService();

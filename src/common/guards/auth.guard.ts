@@ -1,27 +1,23 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
-import { IS_PUBLIC_KEY, IS_SKIP_THIRD_PARTY_KEY } from '../decorators/auth.decorator';
+import { IS_PUBLIC_KEY } from '../decorators/auth.decorator';
+import { sessionService } from '../../storage/database/services';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private configService: ConfigService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    
+    // 公开接口跳过认证
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    const isSkipThirdParty = this.reflector.getAllAndOverride<boolean>(IS_SKIP_THIRD_PARTY_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
     
-    // 公开接口跳过认证
     if (isPublic) {
       return true;
     }
@@ -37,14 +33,32 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('认证格式不正确');
     }
 
-    // TODO: 验证 JWT Token
-    // 这里先简单处理，后续会在 AuthModule 中完善
+    // 验证 Token
     try {
-      // const payload = await this.verifyToken(token);
-      // request.user = payload;
+      const introspection = await sessionService.findByAccessToken(token);
+      
+      if (!introspection) {
+        throw new UnauthorizedException('Token 无效');
+      }
+
+      const expiresAt = new Date(introspection.expires_at);
+      if (expiresAt < new Date()) {
+        await sessionService.delete(token);
+        throw new UnauthorizedException('Token 已过期');
+      }
+
+      // 将用户信息挂载到 request 上
+      (request as any).user = {
+        userId: introspection.user_id,
+        accessToken: token,
+      };
+      
       return true;
     } catch (error) {
-      throw new UnauthorizedException('Token 已过期或无效');
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Token 验证失败');
     }
   }
 }

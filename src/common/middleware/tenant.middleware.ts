@@ -1,20 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class TenantMiddleware {
-  constructor(private configService: ConfigService) {}
-
   use(req: Request, res: Response, next: NextFunction) {
-    const tenantEnabled = this.configService.get<boolean>('tenant.enabled');
-    
-    if (tenantEnabled === false) {
-      // 多租户未启用，设置默认租户
-      (req as any).tenantId = 'default';
-      return next();
-    }
-
     // 从 Header、Query 或 subdomain 获取租户ID
     const tenantId = 
       req.headers['x-tenant-id'] as string ||
@@ -30,6 +19,10 @@ export class TenantMiddleware {
         '/api/auth/wechat',
         '/api/auth/authorize',
         '/api/auth/token',
+        '/api/auth/introspect',
+        '/api/auth/login',
+        '/api/users/register',
+        '/api/users/login',
       ];
       const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
       
@@ -48,11 +41,11 @@ export class TenantMiddleware {
 
   private extractSubdomain(req: Request): string | undefined {
     const host = req.get('host') || '';
-    const subdomain = host.split('.')[0];
+    const parts = host.split('.');
     
-    // 排除 www 和常见端口
-    if (subdomain && subdomain !== 'www' && !subdomain.match(/^\d+$/)) {
-      return subdomain;
+    // 例如: tenant.example.com -> tenant
+    if (parts.length >= 3) {
+      return parts[0];
     }
     
     return undefined;

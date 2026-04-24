@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Post,
   Delete,
   Query,
   Param,
@@ -12,28 +11,22 @@ import {
 import type { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { ThirdPartyService } from './third-party.service';
-import { UsersService } from '../users/users.service';
+import { thirdPartyAuthService } from './third-party.service';
+import { usersService } from '../users/users.service';
 import { Public } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 
 @ApiTags('第三方登录')
 @Controller('auth')
 export class ThirdPartyController {
-  constructor(
-    private readonly thirdPartyService: ThirdPartyService,
-    private readonly usersService: UsersService,
-  ) {}
-
   @Public()
   @Get('github')
   @ApiOperation({ summary: 'GitHub 登录入口' })
-  githubLogin(@Req() req: Request, @Res() res: Response) {
+  githubLogin(@Res() res: Response) {
     const state = crypto.randomBytes(16).toString('hex');
-    const authUrl = this.thirdPartyService.getGithubAuthUrl(state);
+    const authUrl = thirdPartyAuthService.getGithubAuthUrl(state);
     
     res.cookie('oauth_state', state, { httpOnly: true, maxAge: 300000 });
-    
     return res.redirect(authUrl);
   }
 
@@ -59,14 +52,14 @@ export class ThirdPartyController {
     }
 
     try {
-      const userInfo = await this.thirdPartyService.handleThirdPartyLogin(
+      const userInfo = await thirdPartyAuthService.handleThirdPartyLogin(
         'github',
         code,
         this.getIpAddress(req),
         req.headers['user-agent'],
       );
 
-      const user = await this.usersService.createOrUpdateThirdPartyUser(
+      const user = await usersService.createOrUpdateThirdPartyUser(
         userInfo.provider,
         userInfo.providerId,
         userInfo.email,
@@ -74,13 +67,10 @@ export class ThirdPartyController {
         userInfo.avatar,
       );
 
-      const accessToken = `at_${crypto.randomUUID()}`;
-
       res.clearCookie('oauth_state');
 
       const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('provider', 'github');
-      redirectUrl.searchParams.set('token', accessToken);
       redirectUrl.searchParams.set('userId', user.id);
       
       return res.redirect(redirectUrl.toString());
@@ -93,12 +83,11 @@ export class ThirdPartyController {
   @Public()
   @Get('google')
   @ApiOperation({ summary: 'Google 登录入口' })
-  googleLogin(@Req() req: Request, @Res() res: Response) {
+  googleLogin(@Res() res: Response) {
     const state = crypto.randomBytes(16).toString('hex');
-    const authUrl = this.thirdPartyService.getGoogleAuthUrl(state);
+    const authUrl = thirdPartyAuthService.getGoogleAuthUrl(state);
     
     res.cookie('oauth_state', state, { httpOnly: true, maxAge: 300000 });
-    
     return res.redirect(authUrl);
   }
 
@@ -124,14 +113,14 @@ export class ThirdPartyController {
     }
 
     try {
-      const userInfo = await this.thirdPartyService.handleThirdPartyLogin(
+      const userInfo = await thirdPartyAuthService.handleThirdPartyLogin(
         'google',
         code,
         this.getIpAddress(req),
         req.headers['user-agent'],
       );
 
-      const user = await this.usersService.createOrUpdateThirdPartyUser(
+      const user = await usersService.createOrUpdateThirdPartyUser(
         userInfo.provider,
         userInfo.providerId,
         userInfo.email,
@@ -143,7 +132,6 @@ export class ThirdPartyController {
 
       const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('provider', 'google');
-      redirectUrl.searchParams.set('token', `at_${crypto.randomUUID()}`);
       redirectUrl.searchParams.set('userId', user.id);
       
       return res.redirect(redirectUrl.toString());
@@ -156,12 +144,11 @@ export class ThirdPartyController {
   @Public()
   @Get('wechat')
   @ApiOperation({ summary: '微信登录入口' })
-  wechatLogin(@Req() req: Request, @Res() res: Response) {
+  wechatLogin(@Res() res: Response) {
     const state = crypto.randomBytes(16).toString('hex');
-    const authUrl = this.thirdPartyService.getWechatAuthUrl(state);
+    const authUrl = thirdPartyAuthService.getWechatAuthUrl(state);
     
     res.cookie('oauth_state', state, { httpOnly: true, maxAge: 300000 });
-    
     return res.redirect(authUrl);
   }
 
@@ -187,14 +174,14 @@ export class ThirdPartyController {
     }
 
     try {
-      const userInfo = await this.thirdPartyService.handleThirdPartyLogin(
+      const userInfo = await thirdPartyAuthService.handleThirdPartyLogin(
         'wechat',
         code,
         this.getIpAddress(req),
         req.headers['user-agent'],
       );
 
-      const user = await this.usersService.createOrUpdateThirdPartyUser(
+      const user = await usersService.createOrUpdateThirdPartyUser(
         userInfo.provider,
         userInfo.providerId,
         userInfo.email,
@@ -206,7 +193,6 @@ export class ThirdPartyController {
 
       const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('provider', 'wechat');
-      redirectUrl.searchParams.set('token', `at_${crypto.randomUUID()}`);
       redirectUrl.searchParams.set('userId', user.id);
       
       return res.redirect(redirectUrl.toString());
@@ -221,7 +207,7 @@ export class ThirdPartyController {
   @ApiOperation({ summary: '获取已绑定的第三方账户' })
   async getThirdPartyAccounts(@Req() req: Request) {
     const userId = (req as any).user?.userId;
-    return this.thirdPartyService.getUserThirdPartyAccounts(userId);
+    return thirdPartyAuthService.getUserThirdPartyAccounts(userId);
   }
 
   @UseGuards(AuthGuard)
@@ -232,7 +218,7 @@ export class ThirdPartyController {
     @Param('provider') provider: string,
   ) {
     const userId = (req as any).user?.userId;
-    await this.thirdPartyService.unbindThirdPartyAccount(userId, provider);
+    await thirdPartyAuthService.unbindThirdPartyAccount(userId, provider);
     return { message: '解绑成功' };
   }
 
