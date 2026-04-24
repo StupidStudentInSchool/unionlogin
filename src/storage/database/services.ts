@@ -128,6 +128,29 @@ export class OAuthClientService {
   async verifySecret(client: OAuthClient, secret: string): Promise<boolean> {
     return bcrypt.compare(secret, client.client_secret);
   }
+
+  async deleteByClientId(clientId: string, tenantId?: string): Promise<void> {
+    let query = this.client.from('oauth_clients').delete().eq('client_id', clientId);
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    const { error } = await query;
+    if (error) throw new Error(`删除OAuth客户端失败: ${error.message}`);
+  }
+
+  async update(clientId: string, data: any, tenantId?: string): Promise<OAuthClient> {
+    const conditions: any = { client_id: clientId };
+    if (tenantId) conditions.tenant_id = tenantId;
+    
+    const { data: updated, error } = await this.client
+      .from('oauth_clients')
+      .update(data)
+      .match(conditions)
+      .select()
+      .single();
+    if (error) throw new Error(`更新OAuth客户端失败: ${error.message}`);
+    return updated as OAuthClient;
+  }
 }
 
 // 会话服务

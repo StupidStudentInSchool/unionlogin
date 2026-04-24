@@ -37,6 +37,7 @@
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "coze-coding-dev-sdk": "^0.7.21",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "ioredis": "^5.4.2",

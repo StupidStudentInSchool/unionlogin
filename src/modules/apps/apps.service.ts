@@ -1,7 +1,8 @@
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcryptjs';
 import { oauthClientService, auditService } from '../../storage/database/services';
-import { getSupabaseClient } from '../../storage/database/supabase-client';
-import type { OAuthClient, InsertOAuthClient } from '../../storage/database/shared/schema';
+import { secretStorage } from '../../storage/secret-storage';
+import type { OAuthClient } from '../../storage/database/shared/schema';
 
 export class AppsService {
   // 创建应用
@@ -13,12 +14,12 @@ export class AppsService {
   }): Promise<{ app: OAuthClient; clientSecret: string }> {
     const clientId = crypto.randomBytes(16).toString('hex');
     const clientSecret = crypto.randomBytes(32).toString('hex');
-    const hashedSecret = await require('bcryptjs').hash(clientSecret, 12);
+    const hashedSecret = await bcrypt.hash(clientSecret, 12);
 
     const insertData: any = {
       name: data.name,
       client_id: clientId,
-      client_secret: hashedSecret,
+      client_secret: hashedSecret, // 仍然存储 hash 用于快速验证
       redirect_uris: data.redirectUris,
       scopes: data.scopes || ['openid', 'profile', 'email'],
       grant_types: ['authorization_code', 'refresh_token'],
@@ -31,6 +32,14 @@ export class AppsService {
     }
 
     const app = await oauthClientService.create(insertData);
+
+    // 将明文密钥存储到对象存储（用于管理员查看/导出）
+    try {
+      await secretStorage.storeClientSecret(clientId, clientSecret);
+    } catch (error) {
+      console.error('存储 client_secret 到对象存储失败:', error);
+      // 不影响主流程，密钥仍可使用
+    }
 
     return { app, clientSecret };
   }
@@ -60,66 +69,57 @@ export class AppsService {
       throw new Error('客户端已被禁用');
     }
 
+    if (!Array.isArray(app.redirect_uris) || !app.redirect_uris.includes(redirectUri)) {
+      throw new Error('未授权的回调地址');
+    }
+
     // 验证密钥
-    const isValid = await oauthClientService.verifySecret(app, clientSecret);
+    const isValid = await bcrypt.compare(clientSecret, app.client_secret);
     if (!isValid) {
       throw new Error('客户端密钥错误');
     }
 
-    // 验证 redirect_uri
-    const validUris = app.redirect_uris as string[];
-    if (!validUris.includes(redirectUri)) {
-      throw new Error('redirect_uri 不匹配');
+    return app;
+  }
+
+  // 获取应用（管理员）
+  async getAppForAdmin(clientId: string): Promise<{ app: OAuthClient; clientSecret?: string }> {
+    const app = await oauthClientService.findByClientId(clientId);
+    if (!app) {
+      throw new Error('应用不存在');
     }
 
-    await auditService.create({
-      event_type: 'oauth_authorize',
-      client_id: app.id,
-    });
+    // 获取明文密钥
+    let clientSecret: string | undefined;
+    try {
+      clientSecret = await secretStorage.getClientSecret(clientId) || undefined;
+    } catch (error) {
+      console.error('从对象存储获取 client_secret 失败:', error);
+    }
 
-    return app;
+    return { app, clientSecret };
   }
 
   // 删除应用
   async deleteApp(clientId: string, tenantId?: string): Promise<void> {
-    const app = await oauthClientService.findByClientId(clientId);
-    if (!app) {
-      throw new Error('应用不存在');
+    await oauthClientService.deleteByClientId(clientId, tenantId);
+    
+    // 删除对象存储中的密钥
+    try {
+      await secretStorage.deleteClientSecret(clientId);
+    } catch (error) {
+      console.error('删除对象存储中的 client_secret 失败:', error);
     }
-
-    if (tenantId && app.tenant_id !== tenantId) {
-      throw new Error('无权删除此应用');
-    }
-
-    const client = getSupabaseClient();
-    await client.from('oauth_clients').delete().eq('client_id', clientId);
   }
 
   // 更新应用
-  async updateApp(clientId: string, data: {
-    name?: string;
-    redirectUris?: string[];
-    scopes?: string[];
-  }, tenantId?: string): Promise<OAuthClient> {
-    const app = await oauthClientService.findByClientId(clientId);
-    if (!app) {
-      throw new Error('应用不存在');
-    }
-
-    if (tenantId && app.tenant_id !== tenantId) {
-      throw new Error('无权修改此应用');
-    }
-
-    const client = getSupabaseClient();
-    const updateData: any = { updated_at: new Date().toISOString() };
+  async updateApp(clientId: string, data: { name?: string; redirectUris?: string[]; scopes?: string[] }, tenantId?: string): Promise<OAuthClient> {
+    const updateData: any = {};
     if (data.name) updateData.name = data.name;
     if (data.redirectUris) updateData.redirect_uris = data.redirectUris;
     if (data.scopes) updateData.scopes = data.scopes;
-
-    const { data: updated, error } = await client.from('oauth_clients').update(updateData).eq('client_id', clientId).select().single();
-    if (error) throw new Error(`更新应用失败: ${error.message}`);
     
-    return updated as OAuthClient;
+    return oauthClientService.update(clientId, updateData, tenantId);
   }
 }
 
