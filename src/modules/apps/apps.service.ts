@@ -15,16 +15,22 @@ export class AppsService {
     const clientSecret = crypto.randomBytes(32).toString('hex');
     const hashedSecret = await require('bcryptjs').hash(clientSecret, 12);
 
-    const app = await oauthClientService.create({
+    const insertData: any = {
       name: data.name,
       client_id: clientId,
       client_secret: hashedSecret,
       redirect_uris: data.redirectUris,
       scopes: data.scopes || ['openid', 'profile', 'email'],
       grant_types: ['authorization_code', 'refresh_token'],
-      tenant_id: data.tenantId,
       status: 'active',
-    } as any);
+    };
+    
+    // 只有当 tenantId 有效时才设置
+    if (data.tenantId && data.tenantId !== 'default') {
+      insertData.tenant_id = data.tenantId;
+    }
+
+    const app = await oauthClientService.create(insertData);
 
     return { app, clientSecret };
   }

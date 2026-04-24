@@ -1,9 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 
 @Injectable()
-export class TenantMiddleware {
+export class TenantMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
+    // 使用 baseUrl + path 或者直接使用 originalUrl
+    const url = req.originalUrl || req.url;
+    
+    // 公开接口路径（不需要租户标识）
+    const publicPaths = [
+      'github',
+      'google', 
+      'wechat',
+      'authorize',
+      'token',
+      'introspect',
+      'revoke',
+      'login',
+      'register',
+      'tenants',
+    ];
+
+    const isPublic = publicPaths.some(publicPath => 
+      url.includes(publicPath)
+    );
+
+    if (isPublic) {
+      (req as any).tenantId = req.headers['x-tenant-id'] as string || 'default';
+      return next();
+    }
+
     // 从 Header、Query 或 subdomain 获取租户ID
     const tenantId = 
       req.headers['x-tenant-id'] as string ||
@@ -11,31 +37,14 @@ export class TenantMiddleware {
       this.extractSubdomain(req);
 
     if (!tenantId) {
-      // 对于公开接口（如 OAuth 回调）允许不提供租户ID
-      const publicPaths = [
-        '/api/oauth', 
-        '/api/auth/github', 
-        '/api/auth/google', 
-        '/api/auth/wechat',
-        '/api/auth/authorize',
-        '/api/auth/token',
-        '/api/auth/introspect',
-        '/api/auth/login',
-        '/api/users/register',
-        '/api/users/login',
-      ];
-      const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
-      
-      if (!isPublicPath) {
-        res.status(400).json({
-          code: 400,
-          message: '缺少租户标识 (x-tenant-id 或 tenantId)',
-        });
-        return;
-      }
+      res.status(400).json({
+        code: 400,
+        message: '缺少租户标识 (x-tenant-id 或 tenantId)',
+      });
+      return;
     }
 
-    (req as any).tenantId = tenantId || 'default';
+    (req as any).tenantId = tenantId;
     next();
   }
 
@@ -43,7 +52,6 @@ export class TenantMiddleware {
     const host = req.get('host') || '';
     const parts = host.split('.');
     
-    // 例如: tenant.example.com -> tenant
     if (parts.length >= 3) {
       return parts[0];
     }

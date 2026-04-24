@@ -51,7 +51,7 @@ export class UsersService {
   async login(data: {
     login: string;
     password: string;
-  }, ipAddress?: string, userAgent?: string): Promise<{ user: User; requiresMfa?: boolean }> {
+  }, ipAddress?: string, userAgent?: string): Promise<{ user: User; accessToken?: string; refreshToken?: string }> {
     // 支持用户名或邮箱登录
     let user = await userService.findByUsername(data.login);
     if (!user) {
@@ -75,6 +75,21 @@ export class UsersService {
     // 更新登录信息
     await userService.updateLoginInfo(user.id, ipAddress || '');
 
+    // 创建会话并返回 token
+    const accessToken = `at_${crypto.randomUUID()}`;
+    const refreshToken = `rt_${crypto.randomUUID()}`;
+    const expiresAt = new Date(Date.now() + 3600 * 1000); // 1小时后过期
+
+    const client = getSupabaseClient();
+    await client.from('user_sessions').insert({
+      user_id: user.id,
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      ip_address: ipAddress || '',
+      user_agent: userAgent || '',
+      expires_at: expiresAt.toISOString(),
+    });
+
     // 记录审计日志
     await auditService.create({
       event_type: 'login',
@@ -83,7 +98,7 @@ export class UsersService {
       user_agent: userAgent,
     });
 
-    return { user };
+    return { user, accessToken, refreshToken };
   }
 
   // 获取用户信息

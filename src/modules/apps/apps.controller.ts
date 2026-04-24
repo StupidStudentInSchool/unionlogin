@@ -8,10 +8,9 @@ import {
   Param,
   UseGuards,
   Req,
-  Query,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { appsService } from './apps.service';
 import { Public, CurrentUser } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -19,14 +18,14 @@ import { AuthGuard } from '../../common/guards/auth.guard';
 @ApiTags('应用管理')
 @Controller('apps')
 export class AppsController {
-  @UseGuards(AuthGuard)
+  @Public()
   @Post()
-  @ApiOperation({ summary: '创建应用' })
+  @ApiOperation({ summary: '创建应用（无需认证）' })
   async createApp(
     @Body() body: { name: string; redirectUris: string[]; scopes?: string[] },
     @Req() req: Request,
   ) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    const tenantId = (req as any).tenantId;
     const result = await appsService.createApp({ ...body, tenantId });
     
     return {
@@ -43,11 +42,10 @@ export class AppsController {
     };
   }
 
-  @UseGuards(AuthGuard)
   @Get()
   @ApiOperation({ summary: '获取应用列表' })
   async getApps(@Req() req: Request) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    const tenantId = (req as any).tenantId;
     return appsService.getApps(tenantId);
   }
 
@@ -58,7 +56,6 @@ export class AppsController {
     return appsService.getApp(clientId);
   }
 
-  @UseGuards(AuthGuard)
   @Put(':clientId')
   @ApiOperation({ summary: '更新应用' })
   async updateApp(
@@ -66,15 +63,14 @@ export class AppsController {
     @Body() body: { name?: string; redirectUris?: string[]; scopes?: string[] },
     @Req() req: Request,
   ) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    const tenantId = (req as any).tenantId;
     return appsService.updateApp(clientId, body, tenantId);
   }
 
-  @UseGuards(AuthGuard)
   @Delete(':clientId')
   @ApiOperation({ summary: '删除应用' })
   async deleteApp(@Param('clientId') clientId: string, @Req() req: Request) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    const tenantId = (req as any).tenantId;
     await appsService.deleteApp(clientId, tenantId);
     return { success: true };
   }

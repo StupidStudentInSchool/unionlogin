@@ -14,7 +14,6 @@ import { TenantController } from './modules/tenant/tenant.controller';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { TenantMiddleware } from './common/middleware/tenant.middleware';
 
 @Module({
   imports: [
@@ -38,8 +37,4 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
   ],
 })
-export class AppModule {
-  configure(consumer: any) {
-    consumer.apply(TenantMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}
