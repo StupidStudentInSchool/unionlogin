@@ -58,8 +58,19 @@ export class TenantService {
   private client = getSupabaseClient();
 
   async create(data: { name: string; slug: string }): Promise<Tenant> {
+    // 先检查 slug 是否已存在
+    const existing = await this.findBySlug(data.slug);
+    if (existing) {
+      throw new Error('该租户标识已被使用');
+    }
     const { data: tenant, error } = await this.client.from('tenants').insert(data).select().single();
-    if (error) throw new Error(`创建租户失败: ${error.message}`);
+    if (error) {
+      // 可能是数据库层面的唯一约束冲突
+      if (error.code === '23505') {
+        throw new Error('该租户标识已被使用');
+      }
+      throw new Error(`创建租户失败: ${error.message}`);
+    }
     return tenant as Tenant;
   }
 
