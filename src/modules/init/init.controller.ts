@@ -3,7 +3,6 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { transactionService } from '../../storage/database/transaction.service';
 import { auditService } from '../../storage/database/services';
 import { Public } from '../../common/decorators/auth.decorator';
-import * as bcrypt from 'bcryptjs';
 
 @ApiTags('初始化')
 @Controller('api/init')
@@ -37,19 +36,11 @@ export class InitController {
     }
 
     try {
-      // 执行带事务的初始化
+      // 执行带事务的初始化（包含创建 session）
       const result = await transactionService.initializeTenant({
         tenant: { name: body.tenantName, slug: body.tenantSlug },
         admin: { username: body.username, email: body.email, password: body.password },
       });
-
-      // 生成登录 Token
-      const loginResult = await this.generateToken(
-        body.username,
-        body.password,
-        result.tenant.id,
-        result.user.id,
-      );
 
       // 记录审计日志（可选，失败不影响主流程）
       try {
@@ -64,6 +55,7 @@ export class InitController {
         console.warn('审计日志记录失败（不影响主流程）:', auditError);
       }
 
+      // 返回结果，使用数据库 session 的 token
       return {
         tenant: {
           id: result.tenant.id,
@@ -81,40 +73,14 @@ export class InitController {
           clientId: result.app.client_id,
           clientSecret: result.clientSecret,
         } : null,
-        token: loginResult,
+        token: {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        },
       };
     } catch (error: any) {
       console.error('初始化失败:', error);
       throw new Error(error.message || '初始化失败，请稍后重试');
     }
-  }
-
-  /**
-   * 生成访问令牌
-   */
-  private async generateToken(username: string, password: string, tenantId: string, userId: string) {
-    const jwt = await import('jsonwebtoken');
-    const accessToken = jwt.default.sign(
-      {
-        sub: userId,
-        tenantId,
-        username,
-        type: 'access',
-      },
-      process.env.JWT_SECRET || 'identity-center-secret-key-change-in-production',
-      { expiresIn: '1h' },
-    );
-
-    const refreshToken = jwt.default.sign(
-      {
-        sub: userId,
-        tenantId,
-        type: 'refresh',
-      },
-      process.env.JWT_SECRET || 'identity-center-secret-key-change-in-production',
-      { expiresIn: '7d' },
-    );
-
-    return { accessToken, refreshToken };
   }
 }

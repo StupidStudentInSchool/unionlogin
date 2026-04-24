@@ -19,6 +19,8 @@ export class TransactionService {
     user: User;
     app?: OAuthClient;
     clientSecret?: string;
+    accessToken?: string;
+    refreshToken?: string;
   }> {
     const { tenant, admin } = data;
     const results: any = {};
@@ -103,6 +105,31 @@ export class TransactionService {
         // 对象存储失败不影响主流程，但记录警告
         console.warn('⚠️ 密钥存储到对象存储失败:', storageError);
         results.clientSecret = clientSecret; // 仍然返回给用户
+      }
+
+      // 步骤5：创建用户 Session（用于 Token 验证）
+      const accessToken = crypto.randomBytes(32).toString('hex');
+      const refreshToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1小时后过期
+
+      const { error: sessionError } = await this.client
+        .from('user_sessions')
+        .insert({
+          user_id: newUser.id,
+          tenant_id: newTenant.id,
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          expires_at: expiresAt.toISOString(),
+          ip_address: '0.0.0.0',
+          user_agent: 'System',
+        });
+
+      if (sessionError) {
+        console.warn('⚠️ 创建 session 失败:', sessionError.message);
+      } else {
+        results.accessToken = accessToken;
+        results.refreshToken = refreshToken;
+        console.log('✅ Session 创建成功');
       }
 
       return results;

@@ -214,7 +214,8 @@
       try {
         const res = await fetch(`${API}/api/apps`, { headers: getHeaders() });
         const data = await res.json();
-        apps = data.apps || [];
+        // 处理 TransformInterceptor 包装的响应格式
+        apps = data.data?.apps || data.apps || [];
         document.getElementById('stat-apps').textContent = apps.length;
         renderApps();
       } catch (err) {
@@ -226,7 +227,8 @@
       try {
         const res = await fetch(`${API}/api/users`, { headers: getHeaders() });
         const data = await res.json();
-        users = data.users || [];
+        // 处理 TransformInterceptor 包装的响应格式
+        users = data.data?.users || data.users || [];
         document.getElementById('stat-users').textContent = users.length;
         renderUsers();
       } catch (err) {
@@ -337,13 +339,19 @@
         });
         const data = await res.json();
 
-        if (data.app) {
+        if (data.success && data.data?.app) {
+          apps.push(data.data.app);
+          document.getElementById('stat-apps').textContent = apps.length;
+          renderApps();
+          hideAppModal();
+        } else if (data.app) {
+          // 直接返回 app 的情况
           apps.push(data.app);
           document.getElementById('stat-apps').textContent = apps.length;
           renderApps();
           hideAppModal();
         } else {
-          alert(data.message || '创建失败');
+          alert(data.message || data.data?.message || '创建失败');
         }
       } catch (err) {
         alert('创建失败');

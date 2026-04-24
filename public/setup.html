@@ -312,6 +312,7 @@
 
         if (result.success && result.data && result.data.token) {
           const data = result.data;
+          // 存储 JWT Token
           localStorage.setItem(STORAGE_KEYS.token, data.token.accessToken);
           localStorage.setItem(STORAGE_KEYS.refresh, data.token.refreshToken);
           localStorage.setItem(STORAGE_KEYS.tenant, data.tenant.id);
