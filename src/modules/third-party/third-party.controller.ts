@@ -17,7 +17,7 @@ import { Public } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 
 @ApiTags('第三方登录')
-@Controller('auth')
+@Controller('api/auth')
 export class ThirdPartyController {
   @Public()
   @Get('github')

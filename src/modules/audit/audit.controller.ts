@@ -6,7 +6,7 @@ import { Public } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 
 @ApiTags('审计日志')
-@Controller('audit')
+@Controller('api/audit')
 export class AuditController {
   @UseGuards(AuthGuard)
   @Get('logs')

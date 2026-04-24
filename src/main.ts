@@ -7,8 +7,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // 设置全局前缀
-  app.setGlobalPrefix('api');
+  // 不使用全局前缀，每个控制器手动添加 /api 前缀
   
   // 在所有其他中间件之后添加租户中间件
   app.use((req: any, res: any, next: any) => {
@@ -42,7 +41,7 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.APP_PORT || 5000;
   await app.listen(port);

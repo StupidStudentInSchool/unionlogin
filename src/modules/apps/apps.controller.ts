@@ -16,7 +16,7 @@ import { Public, CurrentUser } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 
 @ApiTags('应用管理')
-@Controller('apps')
+@Controller('api/apps')
 export class AppsController {
   @Public()
   @Post()

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { RootController, ApiController } from './app.controller';
 import { AuthController } from './modules/auth/auth.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersController } from './modules/users/users.controller';
@@ -25,6 +26,8 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     TenantModule,
   ],
   controllers: [
+    RootController,
+    ApiController,
     AuthController,
     UsersController,
     AppsController,

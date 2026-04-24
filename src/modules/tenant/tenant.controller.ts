@@ -5,7 +5,7 @@ import { Public } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 
 @ApiTags('租户管理')
-@Controller('tenants')
+@Controller('api/tenants')
 export class TenantController {
   @Public()
   @Post()

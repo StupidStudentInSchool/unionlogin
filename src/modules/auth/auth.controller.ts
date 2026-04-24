@@ -16,7 +16,7 @@ import { Public, CurrentUser } from '../../common/decorators/auth.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 
 @ApiTags('OAuth 2.0 认证')
-@Controller('auth')
+@Controller('api/auth')
 export class AuthController {
   @Public()
   @Get('authorize')
