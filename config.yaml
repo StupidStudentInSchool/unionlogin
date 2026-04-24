@@ -1,0 +1,57 @@
+# =====================================================
+# 统一身份认证中心 - 配置文件
+# =====================================================
+
+# 数据库配置 (MySQL)
+database:
+  host: ${DB_HOST:localhost}
+  port: ${DB_PORT:3306}
+  username: ${DB_USERNAME:root}
+  password: ${DB_PASSWORD:root123}
+  name: ${DB_NAME:identity_center}
+  synchronize: ${DB_SYNC:true}  # 生产环境请设为 false
+  logging: ${DB_LOGGING:true}
+
+# Redis 配置
+redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:}
+  db: ${REDIS_DB:0}
+
+# JWT 配置
+jwt:
+  secret: ${JWT_SECRET:your-super-secret-key-change-in-production}
+  expiresIn: ${JWT_EXPIRES_IN:1h}
+  refreshExpiresIn: ${JWT_REFRESH_EXPIRES_IN:7d}
+
+# OAuth 配置
+oauth:
+  authorizationCodeExpire: 300  # 授权码有效期（秒），默认5分钟
+  accessTokenExpire: 3600        # AccessToken 有效期（秒），默认1小时
+  refreshTokenExpire: 604800    # RefreshToken 有效期（秒），默认7天
+
+# 应用配置
+app:
+  host: ${APP_HOST:0.0.0.0}
+  port: ${APP_PORT:5000}
+  frontendUrl: ${FRONTEND_URL:http://localhost:3000}
+
+# 第三方登录配置
+thirdParty:
+  github:
+    clientID: ${GITHUB_CLIENT_ID:}
+    clientSecret: ${GITHUB_CLIENT_SECRET:}
+    callbackURL: ${GITHUB_CALLBACK_URL:http://localhost:5000/auth/github/callback}
+  google:
+    clientID: ${GOOGLE_CLIENT_ID:}
+    clientSecret: ${GOOGLE_CLIENT_SECRET:}
+    callbackURL: ${GOOGLE_CALLBACK_URL:http://localhost:5000/auth/google/callback}
+  wechat:
+    appID: ${WECHAT_APP_ID:}
+    appSecret: ${WECHAT_APP_SECRET:}
+    callbackURL: ${WECHAT_CALLBACK_URL:http://localhost:5000/auth/wechat/callback}
+
+# 多租户配置
+tenant:
+  enabled: ${TENANT_ENABLED:true}

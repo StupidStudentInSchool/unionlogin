@@ -1,0 +1,11 @@
+[project]
+entrypoint = "src/main.ts"
+requires = ["nodejs-24"]
+
+[dev]
+build = ["pnpm", "install"]
+run = ["pnpm", "start:dev"]
+
+[deploy]
+build = ["pnpm", "install", "&&", "pnpm", "run", "build"]
+run = ["node", "dist/main.js"]
