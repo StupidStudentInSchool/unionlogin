@@ -192,6 +192,18 @@
     let apps = [];
     let users = [];
 
+    // 处理 401 错误 - 自动跳转登录
+    function handleAuthError(response) {
+      if (response.status === 401) {
+        // 清理旧数据
+        Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+        // 跳转登录
+        window.location.href = '/login.html';
+        return true;
+      }
+      return false;
+    }
+
     function getHeaders() {
       const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
       const headers = {
@@ -225,6 +237,7 @@
       try {
         console.log('[DEBUG] loadApps called');
         const res = await fetch(`${API}/api/apps`, { headers: getHeaders() });
+        if (handleAuthError(res)) return;
         console.log('[DEBUG] response status:', res.status);
         const data = await res.json();
         console.log('[DEBUG] response data:', data);
@@ -242,6 +255,7 @@
       try {
         console.log('[DEBUG] loadUsers called');
         const res = await fetch(`${API}/api/users`, { headers: getHeaders() });
+        if (handleAuthError(res)) return;
         console.log('[DEBUG] response status:', res.status);
         const data = await res.json();
         console.log('[DEBUG] response data:', data);

@@ -214,6 +214,18 @@
       return headers;
     }
 
+    // 处理 401 错误 - 自动跳转登录
+    function handleAuthError(response) {
+      if (response.status === 401) {
+        // 清理旧数据
+        Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+        // 跳转登录
+        window.location.href = '/login.html';
+        return true;
+      }
+      return false;
+    }
+
     function checkAuth() {
       const user = JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || '{}');
       if (!user || !user.id) {
@@ -246,11 +258,12 @@
       try {
         const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
         const res = await fetch(`${API}/api/departments?tenantId=${tenant}`, { headers: getHeaders() });
+        if (handleAuthError(res)) return;
         const data = await res.json();
         if (data.success) {
-          departments = flattenTree(data.data);
-          renderDepartmentTree(data.data);
-          populateDepartmentSelect(data.data);
+          departments = flattenTree(data.data?.data || data.data || []);
+          renderDepartmentTree(data.data?.data || data.data || []);
+          populateDepartmentSelect(data.data?.data || data.data || []);
         }
       } catch (err) {
         console.error('加载部门失败', err);
@@ -402,9 +415,10 @@
       try {
         const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
         const res = await fetch(`${API}/api/roles?tenantId=${tenant}`, { headers: getHeaders() });
+        if (handleAuthError(res)) return;
         const data = await res.json();
         if (data.success) {
-          roles = data.data;
+          roles = data.data?.data || data.data || [];
           renderRoles();
         }
       } catch (err) {
@@ -525,9 +539,10 @@
       try {
         const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
         const res = await fetch(`${API}/api/users?tenantId=${tenant}`, { headers: getHeaders() });
+        if (handleAuthError(res)) return;
         const data = await res.json();
         if (data.success) {
-          users = data.data || [];
+          users = data.data?.list || data.data || [];
           renderUsers();
         }
       } catch (err) {
