@@ -192,15 +192,22 @@
     let apps = [];
     let users = [];
 
-    // 处理 401 错误 - 自动跳转登录
+    // 处理 401 错误 - 显示提示，不自动跳转
     function handleAuthError(response) {
       if (response.status === 401) {
-        // 显示提示
-        alert('登录已过期，请重新登录');
-        // 清理旧数据
-        Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
-        // 跳转登录
-        window.location.href = '/login.html';
+        // 显示错误提示，但不自动跳转
+        const errorDiv = document.getElementById('auth-error') || document.createElement('div');
+        errorDiv.id = 'auth-error';
+        errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+        errorDiv.innerHTML = `
+          <span>登录已过期，请</span>
+          <a href="/login.html" class="underline ml-1">重新登录</a>
+          <button onclick="this.parentElement.remove()" class="ml-4 text-red-200 hover:text-white">×</button>
+        `;
+        if (!document.getElementById('auth-error')) {
+          document.body.appendChild(errorDiv);
+        }
+        // 不再自动跳转，让用户自己决定
         return true;
       }
       return false;
@@ -235,11 +242,23 @@
       console.log('[DASHBOARD] user:', user.username);
       console.log('[DASHBOARD] tenant:', localStorage.getItem(STORAGE_KEYS.tenant));
       
+      if (!user || !user.username) {
+        console.log('[DASHBOARD] 用户信息无效，跳转登录');
+        localStorage.clear();
+        window.location.href = '/login.html';
+        return;
+      }
+      
       document.getElementById('username').textContent = user.username || '用户';
       document.getElementById('avatar').textContent = (user.username || 'U')[0].toUpperCase();
 
-      // 加载数据
-      await Promise.all([loadApps(), loadUsers()]);
+      // 加载数据（即使失败也不跳转，只显示错误）
+      try {
+        await Promise.all([loadApps(), loadUsers()]);
+      } catch (err) {
+        console.error('[DASHBOARD] 加载数据失败', err);
+        // 不跳转，只显示错误信息
+      }
     }
 
     async function loadApps() {

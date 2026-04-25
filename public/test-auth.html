@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>认证测试</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">认证状态测试</h1>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-lg font-semibold mb-4">当前 localStorage 状态</h2>
+      <div id="storage-status" class="space-y-2 text-sm font-mono"></div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-lg font-semibold mb-4">API 测试</h2>
+      <button onclick="testAPI()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+        测试 API 请求
+      </button>
+      <div id="api-result" class="mt-4 text-sm font-mono"></div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-lg font-semibold mb-4">快速登录</h2>
+      <button onclick="quickLogin()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+        快速登录 (admin / Admin123!)
+      </button>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-lg font-semibold mb-4">操作</h2>
+      <button onclick="clearStorage()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+        清理 localStorage
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    const STORAGE_KEYS = { 
+      token: 'idc_access_token', 
+      refresh: 'idc_refresh_token',
+      tenant: 'idc_tenant_id', 
+      user: 'idc_user' 
+    };
+
+    function showStorage() {
+      const container = document.getElementById('storage-status');
+      let html = '';
+      
+      for (const [key, lsKey] of Object.entries(STORAGE_KEYS)) {
+        const value = localStorage.getItem(lsKey);
+        if (value) {
+          if (key === 'user') {
+            try {
+              const parsed = JSON.parse(value);
+              html += `<div class="p-2 bg-green-50 rounded"><span class="text-gray-500">${lsKey}:</span> ${parsed.username} (${parsed.tenant_id?.substring(0, 8)}...)</div>`;
+            } catch(e) {
+              html += `<div class="p-2 bg-red-50 rounded text-red-600">${lsKey}: 解析失败</div>`;
+            }
+          } else if (key === 'token' || key === 'refresh') {
+            html += `<div class="p-2 bg-green-50 rounded"><span class="text-gray-500">${lsKey}:</span> ${value.substring(0, 20)}...</div>`;
+          } else {
+            html += `<div class="p-2 bg-green-50 rounded"><span class="text-gray-500">${lsKey}:</span> ${value.substring(0, 20)}...</div>`;
+          }
+        } else {
+          html += `<div class="p-2 bg-red-50 rounded text-red-600">${lsKey}: 未设置</div>`;
+        }
+      }
+      
+      container.innerHTML = html || '<div class="text-gray-500">无数据</div>';
+    }
+
+    async function testAPI() {
+      const token = localStorage.getItem(STORAGE_KEYS.token);
+      const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
+      const resultDiv = document.getElementById('api-result');
+      
+      if (!token) {
+        resultDiv.innerHTML = '<div class="text-red-600">错误: 没有 token</div>';
+        return;
+      }
+      
+      resultDiv.innerHTML = '<div class="text-blue-600">请求中...</div>';
+      
+      try {
+        const url = `${API}/api/users?tenantId=${tenant}`;
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-Id': tenant
+          }
+        });
+        
+        const data = await res.json();
+        
+        if (res.status === 401) {
+          resultDiv.innerHTML = `<div class="text-red-600">
+            <p>401 未授权 - Token 无效或过期</p>
+            <p class="text-xs mt-2">${JSON.stringify(data)}</p>
+          </div>`;
+        } else if (res.ok) {
+          resultDiv.innerHTML = `<div class="text-green-600">
+            <p>✅ API 正常响应</p>
+            <p class="text-xs mt-2">用户数: ${data.data?.list?.length || 0}</p>
+          </div>`;
+        } else {
+          resultDiv.innerHTML = `<div class="text-orange-600">
+            <p>HTTP ${res.status}</p>
+            <p class="text-xs mt-2">${JSON.stringify(data)}</p>
+          </div>`;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = `<div class="text-red-600">请求失败: ${err.message}</div>`;
+      }
+    }
+
+    async function quickLogin() {
+      const resultDiv = document.getElementById('api-result');
+      resultDiv.innerHTML = '<div class="text-blue-600">登录中...</div>';
+      
+      // 先获取租户列表
+      const tenantsRes = await fetch(`${API}/api/tenants`);
+      const tenantsData = await tenantsRes.json();
+      const tenant = tenantsData.data?.[0];
+      
+      if (!tenant) {
+        resultDiv.innerHTML = '<div class="text-red-600">没有可用的租户</div>';
+        return;
+      }
+      
+      // 登录
+      const loginRes = await fetch(`${API}/api/users/login`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Tenant-Id': tenant.id
+        },
+        body: JSON.stringify({ login: 'admin', password: 'Admin123!' })
+      });
+      
+      const loginData = await loginRes.json();
+      
+      if (loginData.success && loginData.data?.accessToken) {
+        localStorage.setItem(STORAGE_KEYS.token, loginData.data.accessToken);
+        localStorage.setItem(STORAGE_KEYS.refresh, loginData.data.refreshToken);
+        localStorage.setItem(STORAGE_KEYS.tenant, loginData.data.user.tenant_id);
+        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.data.user));
+        
+        resultDiv.innerHTML = `<div class="text-green-600">
+          <p>✅ 登录成功!</p>
+          <p class="text-xs mt-2">Token: ${loginData.data.accessToken.substring(0, 20)}...</p>
+        </div>`;
+        
+        showStorage();
+      } else {
+        resultDiv.innerHTML = `<div class="text-red-600">登录失败: ${JSON.stringify(loginData)}</div>`;
+      }
+    }
+
+    function clearStorage() {
+      Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+      showStorage();
+      document.getElementById('api-result').innerHTML = '<div class="text-green-600">已清理</div>';
+    }
+
+    // 页面加载时显示状态
+    showStorage();
+  </script>
+</body>
+</html>

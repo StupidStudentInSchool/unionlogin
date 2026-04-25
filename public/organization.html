@@ -214,12 +214,20 @@
       return headers;
     }
 
-    // 处理 401 错误 - 自动跳转登录
+    // 处理 401 错误 - 显示提示，不自动跳转
     function handleAuthError(response) {
       if (response.status === 401) {
-        alert('登录已过期，请重新登录');
-        Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
-        window.location.href = '/login.html';
+        const errorDiv = document.getElementById('auth-error') || document.createElement('div');
+        errorDiv.id = 'auth-error';
+        errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+        errorDiv.innerHTML = `
+          <span>登录已过期，请</span>
+          <a href="/login.html" class="underline ml-1">重新登录</a>
+          <button onclick="this.parentElement.remove()" class="ml-4 text-red-200 hover:text-white">×</button>
+        `;
+        if (!document.getElementById('auth-error')) {
+          document.body.appendChild(errorDiv);
+        }
         return true;
       }
       return false;
@@ -233,8 +241,15 @@
       console.log('[ORG] tenant:', localStorage.getItem(STORAGE_KEYS.tenant));
       
       if (!token || !user || !user.id) {
-        console.log('[ORG] 认证失败，跳转登录');
-        window.location.href = '/login.html';
+        console.log('[ORG] 认证失败，显示错误');
+        // 显示错误提示，而不是直接跳转
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+        errorDiv.innerHTML = `
+          <span>未登录，请</span>
+          <a href="/login.html" class="underline ml-1">前往登录</a>
+        `;
+        document.body.appendChild(errorDiv);
         return;
       }
       document.getElementById('user-info').textContent = user.username || user.email;
