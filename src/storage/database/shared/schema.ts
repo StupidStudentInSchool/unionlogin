@@ -76,6 +76,7 @@ export const oauth_clients = pgTable(
     name: varchar("name", { length: 128 }).notNull(),
     client_id: varchar("client_id", { length: 64 }).notNull().unique(),
     client_secret: varchar("client_secret", { length: 255 }).notNull(),
+    client_secret_plain: varchar("client_secret_plain", { length: 255 }),
     redirect_uris: jsonb("redirect_uris").notNull().default(sql`'[]'`),
     grant_types: jsonb("grant_types").notNull().default(sql`'["authorization_code"]'`),
     scopes: jsonb("scopes").notNull().default(sql`'["openid", "profile", "email"]'`),

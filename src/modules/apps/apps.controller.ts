@@ -91,4 +91,15 @@ export class AppsController {
       clientSecret: result.clientSecret,
     };
   }
+
+  @UseGuards(AuthGuard)
+  @Post(':clientId/regenerate-secret')
+  @ApiOperation({ summary: '重新生成密钥' })
+  async regenerateSecret(@Param('clientId') clientId: string) {
+    const result = await appsService.regenerateSecret(clientId);
+    return {
+      success: true,
+      clientSecret: result.clientSecret,
+    };
+  }
 }

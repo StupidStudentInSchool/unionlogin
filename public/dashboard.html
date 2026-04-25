@@ -462,11 +462,39 @@
         if (data.clientSecret) {
           showClientSecretModal(data.app?.name || '应用', clientId, data.clientSecret);
         } else {
-          alert('无法获取密钥，密钥可能未被保存');
+          // 密钥不存在，提示用户可以重新生成
+          if (confirm('该应用的密钥未被保存。是否重新生成新密钥？\n\n注意：重新生成后，旧密钥将立即失效，使用旧密钥的应用需要更新配置。')) {
+            await regenerateSecret(clientId);
+          }
         }
       } catch (err) {
         console.error('获取密钥失败:', err);
         alert('获取密钥失败');
+      }
+    }
+
+    // 重新生成密钥
+    async function regenerateSecret(clientId) {
+      try {
+        const res = await fetch(`${API}/api/apps/${clientId}/regenerate-secret`, {
+          method: 'POST',
+          headers: getHeaders(),
+        });
+        
+        if (!res.ok) {
+          alert('重新生成密钥失败');
+          return;
+        }
+        
+        const data = await res.json();
+        
+        if (data.clientSecret) {
+          showClientSecretModal('应用（新密钥）', clientId, data.clientSecret);
+          showToast('密钥已重新生成，旧密钥已失效', 'success');
+        }
+      } catch (err) {
+        console.error('重新生成密钥失败:', err);
+        alert('重新生成密钥失败');
       }
     }
 
