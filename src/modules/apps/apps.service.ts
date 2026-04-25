@@ -107,6 +107,9 @@ export class AppsService {
     }
 
     // 验证密钥
+    if (!app.client_secret) {
+      throw new Error('客户端未配置密钥');
+    }
     const isValid = await bcrypt.compare(clientSecret, app.client_secret);
     if (!isValid) {
       throw new Error('客户端密钥错误');

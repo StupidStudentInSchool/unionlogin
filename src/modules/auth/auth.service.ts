@@ -57,7 +57,7 @@ export class AuthService {
       throw new Error('无效的授权码');
     }
 
-    const codeData = JSON.parse(session.refresh_token || '{}');
+    const codeData = JSON.parse(session.refresh_token_hash || '{}');
     if (
       codeData.clientId !== clientId ||
       codeData.redirectUri !== redirectUri
@@ -69,7 +69,7 @@ export class AuthService {
     await this.client
       .from('user_sessions')
       .delete()
-      .eq('access_token', `code_${code}`);
+      .eq('token_hash', `code_${code}`);
 
     // 生成 Access Token 和 Refresh Token
     const accessToken = `at_${crypto.randomUUID()}`;

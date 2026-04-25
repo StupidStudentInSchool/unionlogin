@@ -197,6 +197,7 @@ export class OAuthClientService {
   }
 
   async verifySecret(client: OAuthClient, secret: string): Promise<boolean> {
+    if (!client.client_secret) return false;
     return bcrypt.compare(secret, client.client_secret);
   }
 
