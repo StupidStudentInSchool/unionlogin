@@ -70,8 +70,8 @@ Identity Center 是一个基于 **OAuth 2.0 / OIDC 协议**的统一身份认证
 
 | 凭证 | 说明 | 示例 |
 |------|------|------|
-| `client_id` | 应用唯一标识 | `46eb72e2551ae11605abe19e5c315cc7` |
-| `client_secret` | 应用密钥（需妥善保管） | `$2b$12$tS1VFM7DCJKLTeelcSn0Ju...` |
+| `client_id` | 应用唯一标识（公开） | `46eb72e2551ae11605abe19e5c315cc7` |
+| `client_secret` | 应用密钥（需妥善保管） | `a1b2c3d4e5f6...`（64位十六进制字符串） |
 | `redirect_uris` | 授权回调地址 | `https://your-app.com/callback` |
 
 **注册方式**：
@@ -80,10 +80,19 @@ Identity Center 是一个基于 **OAuth 2.0 / OIDC 协议**的统一身份认证
 2. 进入"应用管理"页面
 3. 点击"创建应用"按钮
 4. 填写应用名称、回调地址等信息
-5. 创建成功后，系统会生成 `client_id` 和 `client_secret`
+5. 创建成功后，系统会弹出窗口显示 **Client ID** 和 **Client Secret**
 
-**重要提示**：
-- `client_secret` 只在创建时显示一次，请务必保存
+**⚠️ 重要提示**：
+
+> **Client Secret 只会在创建应用时显示一次！** 请务必立即复制并安全保存。关闭弹窗后，Client Secret 将无法再次查看。
+>
+> 如果 Client Secret 丢失，您需要删除应用并重新创建。
+
+**安全建议**：
+
+- `client_id` 可以公开，用于标识您的应用
+- `client_secret` 必须保密，不要提交到代码仓库、不要暴露在前端代码中
+- 建议使用环境变量存储 `client_secret`：`IDC_CLIENT_SECRET=xxx`
 - 回调地址必须与实际请求中的 `redirect_uri` 完全匹配（包括协议、域名、端口、路径）
 
 ### 步骤 2：配置应用
