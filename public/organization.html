@@ -217,9 +217,8 @@
     // 处理 401 错误 - 自动跳转登录
     function handleAuthError(response) {
       if (response.status === 401) {
-        // 清理旧数据
+        alert('登录已过期，请重新登录');
         Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
-        // 跳转登录
         window.location.href = '/login.html';
         return true;
       }
