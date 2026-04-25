@@ -462,10 +462,8 @@
         if (data.clientSecret) {
           showClientSecretModal(data.app?.name || '应用', clientId, data.clientSecret);
         } else {
-          // 密钥不存在，提示用户可以重新生成
-          if (confirm('该应用的密钥未被保存。是否重新生成新密钥？\n\n注意：重新生成后，旧密钥将立即失效，使用旧密钥的应用需要更新配置。')) {
-            await regenerateSecret(clientId);
-          }
+          // 密钥不存在，自动重新生成
+          await regenerateSecret(clientId, data.app?.name || '应用');
         }
       } catch (err) {
         console.error('获取密钥失败:', err);
@@ -474,7 +472,7 @@
     }
 
     // 重新生成密钥
-    async function regenerateSecret(clientId) {
+    async function regenerateSecret(clientId, appName) {
       try {
         const res = await fetch(`${API}/api/apps/${clientId}/regenerate-secret`, {
           method: 'POST',
@@ -482,19 +480,18 @@
         });
         
         if (!res.ok) {
-          alert('重新生成密钥失败');
+          alert('获取密钥失败');
           return;
         }
         
         const data = await res.json();
         
         if (data.clientSecret) {
-          showClientSecretModal('应用（新密钥）', clientId, data.clientSecret);
-          alert('密钥已重新生成，旧密钥已失效');
+          showClientSecretModal(appName, clientId, data.clientSecret);
         }
       } catch (err) {
-        console.error('重新生成密钥失败:', err);
-        alert('重新生成密钥失败');
+        console.error('获取密钥失败:', err);
+        alert('获取密钥失败');
       }
     }
 
