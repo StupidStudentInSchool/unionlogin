@@ -92,9 +92,27 @@ function getSupabaseClient(): SupabaseClient {
       autoRefreshToken: false,
       persistSession: false,
     },
+    db: {
+      schema: 'public',
+    },
   });
   
   return _client;
 }
 
-export { loadEnv, getSupabaseCredentials, getSupabaseClient };
+// 为新表创建专门的客户端（绕过 schema 缓存）
+function createNewClient(): SupabaseClient {
+  const { url, anonKey, serviceRoleKey } = getSupabaseCredentials();
+  
+  return createClient(url, serviceRoleKey || anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    db: {
+      schema: 'public',
+    },
+  });
+}
+
+export { loadEnv, getSupabaseCredentials, getSupabaseClient, createNewClient };

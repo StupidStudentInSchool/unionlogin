@@ -1,5 +1,5 @@
-import { getSupabaseClient } from './supabase-client';
-export { getSupabaseClient };
+import { getSupabaseClient, createNewClient } from './supabase-client';
+export { getSupabaseClient, createNewClient };
 import * as bcrypt from 'bcryptjs';
 import type { User, Tenant, OAuthClient, AuditLog, ThirdPartyAccount, UserSession } from './shared/schema';
 
@@ -287,23 +287,31 @@ export class RoleService {
   private client = getSupabaseClient();
 
   async getUserRoles(userId: string): Promise<{ id: string; name: string; code: string }[]> {
-    const { data, error } = await this.client
-      .from('user_roles')
-      .select(`
-        roles (
-          id,
-          name,
-          code
-        )
-      `)
-      .eq('user_id', userId);
+    try {
+      // 从 users 表的 metadata 字段获取角色
+      const { data, error } = await this.client
+        .from('users')
+        .select('metadata')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (error) {
-      console.warn('获取用户角色失败:', error.message);
+      if (error || !data) {
+        console.warn('获取用户角色失败:', error?.message);
+        return [];
+      }
+
+      // 从 metadata 中提取 roles
+      const metadata = (data.metadata || {}) as Record<string, any>;
+      const roles = metadata.roles || [];
+      return roles.map((r: any) => ({
+        id: r.id || r,
+        name: r.name || r,
+        code: r.code || r,
+      }));
+    } catch (err) {
+      console.warn('获取用户角色异常:', err);
       return [];
     }
-
-    return (data || []).map((item: any) => item.roles).filter(Boolean);
   }
 
   async getUserRoleCodes(userId: string): Promise<string[]> {
@@ -312,15 +320,32 @@ export class RoleService {
   }
 
   async assignRoleToUser(userId: string, roleId: string): Promise<void> {
-    const { error } = await this.client
-      .from('user_roles')
-      .insert({
-        user_id: userId,
-        role_id: roleId,
-      });
+    try {
+      const user = await userService.findById(userId);
+      if (!user) throw new Error('用户不存在');
 
-    if (error && error.code !== '23505') { // 忽略重复插入错误
-      throw new Error(`分配角色失败: ${error.message}`);
+      const metadata = (user.metadata || {}) as Record<string, any>;
+      const roles = metadata.roles || [];
+
+      // 检查是否已存在
+      if (roles.some((r: any) => r.id === roleId)) {
+        return; // 已存在，跳过
+      }
+
+      // 添加新角色
+      const { error } = await this.client
+        .from('users')
+        .update({
+          metadata: {
+            ...metadata,
+            roles: [...roles, roleId],
+          },
+        })
+        .eq('id', userId);
+
+      if (error) throw new Error(`分配角色失败: ${error.message}`);
+    } catch (err) {
+      console.warn('分配角色失败:', err);
     }
   }
 }
