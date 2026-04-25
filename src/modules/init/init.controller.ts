@@ -45,6 +45,11 @@ export class InitController {
       });
 
       // 创建默认角色和部门
+      const defaultRoles: any[] = [];
+      const defaultDepts: any[] = [];
+      const defaultRole = { id: null as string | null, name: null as string | null, code: null as string | null };
+      const defaultDept = { id: null as string | null, name: null as string | null, code: null as string | null };
+
       try {
         // 创建管理员角色
         const { data: adminRole, error: roleError } = await client
@@ -63,6 +68,10 @@ export class InitController {
 
         if (!roleError && adminRole) {
           console.log('✅ 默认管理员角色创建成功:', adminRole.id);
+          defaultRole.id = adminRole.id;
+          defaultRole.name = adminRole.name;
+          defaultRole.code = adminRole.code;
+          defaultRoles.push(adminRole);
         }
 
         // 创建普通用户角色
@@ -82,25 +91,134 @@ export class InitController {
 
         if (!userRoleError && userRole) {
           console.log('✅ 默认普通用户角色创建成功:', userRole.id);
+          defaultRoles.push(userRole);
         }
 
-        // 创建默认部门
-        const { data: dept, error: deptError } = await client
-          .from('departments')
+        // 创建部门经理角色
+        const { data: managerRole, error: managerRoleError } = await client
+          .from('roles')
           .insert({
             tenant_id: result.tenant.id,
-            name: '总经办',
-            code: 'ceo',
-            level: 1,
-            sort_order: 1,
-            description: '默认部门',
+            name: '部门经理',
+            code: 'manager',
+            level: 50,
+            description: '部门经理角色',
+            is_system: true,
             status: 'active',
           })
           .select()
           .single();
 
-        if (!deptError && dept) {
-          console.log('✅ 默认部门创建成功:', dept.id);
+        if (!managerRoleError && managerRole) {
+          console.log('✅ 部门经理角色创建成功:', managerRole.id);
+          defaultRoles.push(managerRole);
+        }
+
+        // 创建总公司
+        const { data: rootDept, error: rootDeptError } = await client
+          .from('departments')
+          .insert({
+            tenant_id: result.tenant.id,
+            name: body.tenantName, // 使用租户名称作为总公司名称
+            code: 'hq',
+            level: 0,
+            sort_order: 0,
+            description: `${body.tenantName}总部`,
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (!rootDeptError && rootDept) {
+          console.log('✅ 总部创建成功:', rootDept.id);
+          defaultDept.id = rootDept.id;
+          defaultDept.name = rootDept.name;
+          defaultDept.code = rootDept.code;
+          defaultDepts.push(rootDept);
+        }
+
+        // 创建总经办
+        const { data: ceoDept, error: ceoDeptError } = await client
+          .from('departments')
+          .insert({
+            tenant_id: result.tenant.id,
+            name: '总经办',
+            code: 'ceo_office',
+            parent_id: rootDept?.id || null,
+            level: 1,
+            sort_order: 1,
+            description: '总经理办公室',
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (!ceoDeptError && ceoDept) {
+          console.log('✅ 总经办创建成功:', ceoDept.id);
+          defaultDepts.push(ceoDept);
+        }
+
+        // 创建技术部
+        const { data: techDept, error: techDeptError } = await client
+          .from('departments')
+          .insert({
+            tenant_id: result.tenant.id,
+            name: '技术部',
+            code: 'tech',
+            parent_id: rootDept?.id || null,
+            level: 1,
+            sort_order: 10,
+            description: '技术研发部门',
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (!techDeptError && techDept) {
+          console.log('✅ 技术部创建成功:', techDept.id);
+          defaultDepts.push(techDept);
+        }
+
+        // 创建人力资源部
+        const { data: hrDept, error: hrDeptError } = await client
+          .from('departments')
+          .insert({
+            tenant_id: result.tenant.id,
+            name: '人力资源部',
+            code: 'hr',
+            parent_id: rootDept?.id || null,
+            level: 1,
+            sort_order: 20,
+            description: '人力资源部门',
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (!hrDeptError && hrDept) {
+          console.log('✅ 人力资源部创建成功:', hrDept.id);
+          defaultDepts.push(hrDept);
+        }
+
+        // 创建财务部
+        const { data: financeDept, error: financeDeptError } = await client
+          .from('departments')
+          .insert({
+            tenant_id: result.tenant.id,
+            name: '财务部',
+            code: 'finance',
+            parent_id: rootDept?.id || null,
+            level: 1,
+            sort_order: 30,
+            description: '财务管理部门',
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (!financeDeptError && financeDept) {
+          console.log('✅ 财务部创建成功:', financeDept.id);
+          defaultDepts.push(financeDept);
         }
 
         // 给管理员分配 admin 角色
@@ -116,12 +234,12 @@ export class InitController {
           console.log('✅ 管理员角色分配成功');
         }
 
-        // 给用户分配默认部门
-        if (dept) {
+        // 给用户分配总经办
+        if (ceoDept) {
           await client
             .from('users')
             .update({
-              department_id: dept.id,
+              department_id: ceoDept.id,
             })
             .eq('id', result.user.id);
           console.log('✅ 用户部门分配成功');
@@ -145,6 +263,8 @@ export class InitController {
 
       // 返回结果，使用数据库 session 的 token
       return {
+        success: true,
+        message: '初始化成功',
         tenant: {
           id: result.tenant.id,
           name: result.tenant.name,
@@ -164,6 +284,10 @@ export class InitController {
         token: {
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
+        },
+        defaults: {
+          roles: defaultRoles,
+          departments: defaultDepts,
         },
       };
     } catch (error: any) {
