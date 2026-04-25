@@ -50,8 +50,32 @@ export class InitController {
       const defaultRole = { id: null as string | null, name: null as string | null, code: null as string | null };
       const defaultDept = { id: null as string | null, name: null as string | null, code: null as string | null };
 
+      // 系统权限定义
+      const ALL_PERMISSIONS = [
+        'user:read', 'user:write', 'user:delete',
+        'role:read', 'role:write', 'role:delete',
+        'department:read', 'department:write', 'department:delete',
+        'app:read', 'app:write', 'app:delete',
+        'tenant:read', 'tenant:write',
+        'audit:read',
+        'settings:read', 'settings:write',
+        '*',
+      ];
+
+      // 普通用户权限：只读
+      const USER_PERMISSIONS = ['user:read', 'role:read', 'department:read', 'app:read'];
+      
+      // 部门经理权限：读写部门 + 只读其他
+      const MANAGER_PERMISSIONS = [
+        'user:read', 'user:write',
+        'role:read',
+        'department:read', 'department:write',
+        'app:read',
+        'audit:read',
+      ];
+
       try {
-        // 创建管理员角色
+        // 创建管理员角色（拥有所有权限）
         const { data: adminRole, error: roleError } = await client
           .from('roles')
           .insert({
@@ -59,9 +83,10 @@ export class InitController {
             name: '管理员',
             code: 'admin',
             level: 100,
-            description: '系统管理员角色',
+            description: '系统管理员角色，拥有所有权限',
             is_system: true,
             status: 'active',
+            permissions: ALL_PERMISSIONS,
           })
           .select()
           .single();
@@ -82,9 +107,10 @@ export class InitController {
             name: '普通用户',
             code: 'user',
             level: 1,
-            description: '普通用户角色',
+            description: '普通用户角色，只读权限',
             is_system: true,
             status: 'active',
+            permissions: USER_PERMISSIONS,
           })
           .select()
           .single();
@@ -102,9 +128,10 @@ export class InitController {
             name: '部门经理',
             code: 'manager',
             level: 50,
-            description: '部门经理角色',
+            description: '部门经理角色，可管理部门',
             is_system: true,
             status: 'active',
+            permissions: MANAGER_PERMISSIONS,
           })
           .select()
           .single();

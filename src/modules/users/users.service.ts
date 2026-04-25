@@ -118,12 +118,44 @@ export class UsersService {
       }
     }
 
+    // 获取用户权限
+    let permissions: string[] = [];
+    try {
+      const client = getSupabaseClient();
+      const roleIds = (user as any).metadata?.roles || [];
+      if (roleIds.length > 0) {
+        const { data: roleData } = await client
+          .from('roles')
+          .select('code, permissions')
+          .in('id', roleIds);
+        
+        if (roleData) {
+          const allPermissions = new Set<string>();
+          for (const role of roleData) {
+            // 管理员角色拥有所有权限
+            if (role.code === 'admin') {
+              permissions = ['*'];
+              break;
+            }
+            if (role.permissions && Array.isArray(role.permissions)) {
+              role.permissions.forEach((p: string) => allPermissions.add(p));
+            }
+          }
+          if (permissions.length === 0) {
+            permissions = Array.from(allPermissions);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('获取权限失败:', err);
+    }
+
     // 构建完整的用户信息
     const userWithDetails: UserWithDetails = {
       ...user,
       department,
       roles,
-      permissions: [],
+      permissions,
     };
 
     // 记录审计日志
