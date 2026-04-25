@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录诊断 - Identity Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">登录诊断工具</h1>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-4">
+      <h2 class="text-lg font-semibold mb-4">步骤 1: 当前 localStorage 状态</h2>
+      <div id="storage-status" class="font-mono text-sm bg-gray-50 p-4 rounded"></div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-4">
+      <h2 class="text-lg font-semibold mb-4">步骤 2: 执行登录</h2>
+      <button onclick="doLogin()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+        执行登录并存储
+      </button>
+      <div id="login-result" class="mt-4 font-mono text-sm bg-gray-50 p-4 rounded"></div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-4">
+      <h2 class="text-lg font-semibold mb-4">步骤 3: 验证存储</h2>
+      <button onclick="verifyStorage()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+        验证 localStorage
+      </button>
+      <div id="verify-result" class="mt-4 font-mono text-sm bg-gray-50 p-4 rounded"></div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-4">
+      <h2 class="text-lg font-semibold mb-4">步骤 4: 测试 API</h2>
+      <button onclick="testAPI()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        测试 API 请求
+      </button>
+      <div id="api-result" class="mt-4 font-mono text-sm bg-gray-50 p-4 rounded"></div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-lg font-semibold mb-4">操作</h2>
+      <div class="flex gap-4">
+        <button onclick="clearStorage()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+          清理 localStorage
+        </button>
+        <button onclick="goDashboard()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+          前往 Dashboard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    const KEYS = {
+      token: 'idc_access_token',
+      refresh: 'idc_refresh_token',
+      tenant: 'idc_tenant_id',
+      user: 'idc_user'
+    };
+    
+    let loginToken = null;
+    
+    function showStatus(id, html) {
+      document.getElementById(id).innerHTML = html;
+    }
+    
+    function checkStorage() {
+      let html = '';
+      for (const [key, lsKey] of Object.entries(KEYS)) {
+        const value = localStorage.getItem(lsKey);
+        if (value) {
+          if (key === 'user') {
+            try {
+              const parsed = JSON.parse(value);
+              html += `<div class="text-green-700 mb-2">✅ ${lsKey}: ${JSON.stringify(parsed).substring(0, 100)}...</div>`;
+            } catch(e) {
+              html += `<div class="text-red-700 mb-2">❌ ${lsKey}: 解析失败</div>`;
+            }
+          } else {
+            html += `<div class="text-green-700 mb-2">✅ ${lsKey}: ${value.substring(0, 30)}...</div>`;
+          }
+        } else {
+          html += `<div class="text-red-700 mb-2">❌ ${lsKey}: 未设置</div>`;
+        }
+      }
+      showStatus('storage-status', html || '<div class="text-gray-500">无数据</div>');
+    }
+    
+    async function doLogin() {
+      showStatus('login-result', '<div class="text-blue-600">登录中...</div>');
+      
+      try {
+        // 获取租户
+        const tenantsRes = await fetch(`${API}/api/tenants`);
+        const tenantsData = await tenantsRes.json();
+        const tenant = tenantsData.data?.[0];
+        
+        if (!tenant) {
+          throw new Error('没有租户');
+        }
+        
+        // 登录
+        const loginRes = await fetch(`${API}/api/users/login`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Tenant-Id': tenant.id 
+          },
+          body: JSON.stringify({ login: 'admin', password: 'Admin123!' })
+        });
+        
+        const loginData = await loginRes.json();
+        
+        if (!loginData.success || !loginData.data?.accessToken) {
+          throw new Error(loginData.message || '登录失败');
+        }
+        
+        const { accessToken, refreshToken, user } = loginData.data;
+        loginToken = accessToken;
+        
+        // 存储
+        localStorage.setItem(KEYS.token, accessToken);
+        localStorage.setItem(KEYS.refresh, refreshToken || '');
+        localStorage.setItem(KEYS.tenant, user.tenant_id);
+        localStorage.setItem(KEYS.user, JSON.stringify(user));
+        
+        showStatus('login-result', `
+          <div class="text-green-700">✅ 登录成功</div>
+          <div class="mt-2">服务器返回 Token:</div>
+          <div class="text-xs break-all mt-1">${accessToken}</div>
+          <div class="mt-2">用户: ${user.username}</div>
+          <div class="mt-1">租户: ${user.tenant_id}</div>
+        `);
+        
+        checkStorage();
+        
+      } catch (err) {
+        showStatus('login-result', `<div class="text-red-700">❌ 错误: ${err.message}</div>`);
+      }
+    }
+    
+    function verifyStorage() {
+      const storedToken = localStorage.getItem(KEYS.token);
+      
+      let html = '';
+      html += `<div>登录返回的 Token:</div>`;
+      html += `<div class="text-xs break-all mb-2">${loginToken || '未执行登录'}</div>`;
+      html += `<div>localStorage 中存储的 Token:</div>`;
+      html += `<div class="text-xs break-all mb-2">${storedToken || '未存储'}</div>`;
+      
+      if (loginToken && storedToken) {
+        if (loginToken === storedToken) {
+          html += `<div class="text-green-700 font-bold">✅ Token 一致！</div>`;
+        } else {
+          html += `<div class="text-red-700 font-bold">❌ Token 不一致！</div>`;
+          html += `<div class="text-red-600 mt-2">这可能是浏览器扩展或其他代码覆盖了 localStorage</div>`;
+        }
+      }
+      
+      showStatus('verify-result', html);
+    }
+    
+    async function testAPI() {
+      const token = localStorage.getItem(KEYS.token);
+      const tenant = localStorage.getItem(KEYS.tenant);
+      
+      if (!token) {
+        showStatus('api-result', '<div class="text-red-700">❌ 没有 token，请先登录</div>');
+        return;
+      }
+      
+      showStatus('api-result', '<div class="text-blue-600">请求中...</div>');
+      
+      try {
+        const res = await fetch(`${API}/api/users?tenantId=${tenant}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-Id': tenant
+          }
+        });
+        
+        const data = await res.json();
+        
+        if (res.status === 401) {
+          showStatus('api-result', `
+            <div class="text-red-700">❌ 401 未授权</div>
+            <div class="text-xs mt-2">发送的 Token: ${token}</div>
+            <div class="text-xs mt-1">响应: ${JSON.stringify(data)}</div>
+          `);
+        } else if (res.ok) {
+          showStatus('api-result', `
+            <div class="text-green-700">✅ API 正常</div>
+            <div class="text-xs mt-2">用户数: ${data.data?.list?.length || 0}</div>
+          `);
+        } else {
+          showStatus('api-result', `
+            <div class="text-orange-700">HTTP ${res.status}</div>
+            <div class="text-xs mt-2">${JSON.stringify(data)}</div>
+          `);
+        }
+      } catch (err) {
+        showStatus('api-result', `<div class="text-red-700">❌ 错误: ${err.message}</div>`);
+      }
+    }
+    
+    function clearStorage() {
+      Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+      checkStorage();
+      loginToken = null;
+      showStatus('login-result', '<div class="text-gray-500">已清理</div>');
+      showStatus('verify-result', '');
+      showStatus('api-result', '');
+    }
+    
+    function goDashboard() {
+      window.location.href = '/dashboard.html';
+    }
+    
+    // 页面加载时检查
+    checkStorage();
+  </script>
+</body>
+</html>
