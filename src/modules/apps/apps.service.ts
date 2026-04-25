@@ -84,6 +84,11 @@ export class AppsService {
     return app;
   }
 
+  // 根据 client_id 获取应用（内部方法）
+  async findByClientId(clientId: string): Promise<OAuthClient | null> {
+    return oauthClientService.findByClientId(clientId);
+  }
+
   // 验证客户端
   async validateClient(
     clientId: string,

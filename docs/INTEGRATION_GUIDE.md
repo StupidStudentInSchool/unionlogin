@@ -432,6 +432,187 @@ async function handleCallback(code) {
 }
 ```
 
+### 3.8 用户应用权限管理
+
+系统支持对用户进行应用级别的授权管理，控制用户可以访问哪些应用。
+
+#### 权限模型
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           用户应用权限模型                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌─────────────────┐
+                    │     用户         │
+                    │   (users)       │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼                             ▼
+    ┌─────────────────┐           ┌─────────────────┐
+    │   管理员角色     │           │   普通用户       │
+    │  (role=admin)   │           │                 │
+    └────────┬────────┘           └────────┬────────┘
+             │                             │
+             │                             │
+             ▼                             ▼
+    ┌─────────────────┐           ┌─────────────────┐
+    │  默认拥有所有     │           │ user_app_permissions
+    │   应用权限       │           │  (授权关联表)    │
+    └─────────────────┘           └────────┬────────┘
+                                           │
+                                           ▼
+                                  ┌─────────────────┐
+                                  │   应用列表       │
+                                  │ (oauth_clients) │
+                                  └─────────────────┘
+```
+
+#### 权限规则
+
+1. **管理员默认权限**：拥有 `admin` 角色的用户默认拥有所有应用的访问权限
+2. **普通用户权限**：需要管理员显式授权才能访问应用
+3. **权限检查时机**：OAuth 授权流程中会检查用户是否有权访问该应用
+4. **权限拒绝**：无权限的用户访问应用时会收到 `access_denied` 错误
+
+#### 授权流程图
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           用户访问应用授权流程                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    用户 → 应用 → OAuth 授权请求 → 认证中心
+                                          │
+                                          ▼
+                                ┌─────────────────┐
+                                │   用户已登录？   │
+                                └────────┬────────┘
+                                         │
+                              ┌──────────┴──────────┐
+                              │                     │
+                          [已登录]              [未登录]
+                              │                     │
+                              │                     ▼
+                              │           ┌─────────────────┐
+                              │           │   显示登录页面   │
+                              │           └────────┬────────┘
+                              │                    │
+                              └──────────┬─────────┘
+                                         │
+                                         ▼
+                                ┌─────────────────┐
+                                │  检查应用权限    │
+                                └────────┬────────┘
+                                         │
+                              ┌──────────┴──────────┐
+                              │                     │
+                          [有权限]              [无权限]
+                              │                     │
+                              │                     ▼
+                              │           ┌─────────────────┐
+                              │           │ 返回错误：       │
+                              │           │ access_denied   │
+                              │           └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ 生成授权码       │
+                    │ 返回给应用       │
+                    └─────────────────┘
+```
+
+#### API 使用示例
+
+**获取用户授权的应用列表**
+
+```bash
+GET /api/users/{userId}/apps
+Authorization: Bearer {token}
+```
+
+响应：
+
+```json
+{
+  "data": [
+    {
+      "id": "app-uuid-1",
+      "name": "应用A",
+      "client_id": "xxx",
+      "hasPermission": true,
+      "isGrantedByDefault": false,
+      "grantedAt": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "app-uuid-2",
+      "name": "应用B",
+      "client_id": "yyy",
+      "hasPermission": false,
+      "isGrantedByDefault": false
+    }
+  ]
+}
+```
+
+**授权用户访问应用**
+
+```bash
+POST /api/users/{userId}/apps
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "appId": "app-uuid-2"
+}
+```
+
+**批量授权用户访问多个应用**
+
+```bash
+POST /api/users/{userId}/apps/batch
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "appIds": ["app-uuid-1", "app-uuid-2", "app-uuid-3"]
+}
+```
+
+**取消用户应用授权**
+
+```bash
+DELETE /api/users/{userId}/apps/{appId}
+Authorization: Bearer {token}
+```
+
+**检查用户是否有权访问应用**
+
+```bash
+GET /api/users/{userId}/apps/{appId}/check
+Authorization: Bearer {token}
+```
+
+响应：
+
+```json
+{
+  "hasPermission": true
+}
+```
+
+#### 管理后台操作
+
+在管理后台的用户列表中，每个用户右侧有一个"管理应用权限"按钮（钥匙图标）：
+
+1. 点击按钮打开应用权限管理弹窗
+2. 查看用户当前的应用权限状态
+3. 点击"授权"按钮为用户授权应用访问权限
+4. 点击"取消"按钮撤销用户的应用访问权限
+5. 管理员用户的权限显示为"默认授权"，不可撤销
+
 ---
 
 ## 4. OAuth 2.0 对接
@@ -638,6 +819,11 @@ Content-Type: application/json
 | `/api/users` | GET | 获取用户列表 | Bearer Token |
 | `/api/users/stats` | GET | 获取统计数据 | Bearer Token |
 | `/api/users/:id/department` | PUT | 分配用户部门 | Bearer Token |
+| `/api/users/:id/apps` | GET | 获取用户授权的应用列表 | Bearer Token |
+| `/api/users/:id/apps` | POST | 授权用户访问应用 | Bearer Token |
+| `/api/users/:id/apps/batch` | POST | 批量授权用户访问应用 | Bearer Token |
+| `/api/users/:id/apps/:appId` | DELETE | 取消用户应用授权 | Bearer Token |
+| `/api/users/:id/apps/:appId/check` | GET | 检查用户应用权限 | Bearer Token |
 
 #### 用户注册
 

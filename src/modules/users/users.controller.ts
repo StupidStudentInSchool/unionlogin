@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -117,5 +118,60 @@ export class UsersController {
   async getStats(@Req() req: Request) {
     const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
     return usersService.getStats(tenantId);
+  }
+
+  // ==================== 用户应用授权相关接口 ====================
+
+  @UseGuards(AuthGuard)
+  @Get(':id/apps')
+  @ApiOperation({ summary: '获取用户授权的应用列表' })
+  async getUserApps(@Param('id') userId: string) {
+    return usersService.getUserApps(userId);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/apps')
+  @ApiOperation({ summary: '授权用户访问应用' })
+  async grantAppPermission(
+    @Param('id') userId: string,
+    @Body() body: { appId: string },
+    @CurrentUser('userId') currentUserId: string,
+  ) {
+    await usersService.grantAppPermission(userId, body.appId, currentUserId);
+    return { success: true };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(':id/apps/batch')
+  @ApiOperation({ summary: '批量授权用户访问应用' })
+  async grantAppPermissions(
+    @Param('id') userId: string,
+    @Body() body: { appIds: string[] },
+    @CurrentUser('userId') currentUserId: string,
+  ) {
+    await usersService.grantAppPermissions(userId, body.appIds, currentUserId);
+    return { success: true };
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete(':id/apps/:appId')
+  @ApiOperation({ summary: '取消用户应用授权' })
+  async revokeAppPermission(
+    @Param('id') userId: string,
+    @Param('appId') appId: string,
+  ) {
+    await usersService.revokeAppPermission(userId, appId);
+    return { success: true };
+  }
+
+  @UseGuards(AuthGuard)
+  @Get(':id/apps/:appId/check')
+  @ApiOperation({ summary: '检查用户是否有权访问指定应用' })
+  async checkAppPermission(
+    @Param('id') userId: string,
+    @Param('appId') appId: string,
+  ) {
+    const hasPermission = await usersService.hasAppPermission(userId, appId);
+    return { hasPermission };
   }
 }

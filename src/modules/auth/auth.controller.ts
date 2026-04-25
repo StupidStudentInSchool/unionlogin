@@ -37,6 +37,22 @@ export class AuthController {
         try {
           const introspection = await authService.introspectToken(token);
           if (introspection.active && introspection.sub) {
+            // 检查用户是否有权限访问该应用
+            const client = await appsService.findByClientId(clientId);
+            if (client) {
+              const hasPermission = await usersService.hasAppPermission(
+                introspection.sub,
+                client.id,
+              );
+              if (!hasPermission) {
+                return {
+                  requireLogin: false,
+                  error: 'access_denied',
+                  errorDescription: '您没有被授权访问此应用',
+                };
+              }
+            }
+
             const { code, state: newState } =
               await authService.generateAuthorizationCode(
                 clientId,
@@ -145,7 +161,7 @@ export class AuthController {
     @Req() req: Request,
   ) {
     // 验证客户端
-    await appsService.validateClient(
+    const client = await appsService.validateClient(
       body.clientId,
       body.clientSecret,
       body.redirectUri,
@@ -157,6 +173,15 @@ export class AuthController {
       (req.headers['x-forwarded-for'] as string) || '',
       req.headers['user-agent'],
     );
+
+    // 检查用户是否有权限访问该应用
+    const hasPermission = await usersService.hasAppPermission(
+      user.id,
+      client.id,
+    );
+    if (!hasPermission) {
+      throw new Error('您没有被授权访问此应用');
+    }
 
     // 生成授权码
     const { code } = await authService.generateAuthorizationCode(

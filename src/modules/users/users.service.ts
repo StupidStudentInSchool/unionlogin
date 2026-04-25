@@ -526,6 +526,231 @@ export class UsersService {
       todayActive: todayCount || 0,
     };
   }
+
+  // 检查用户是否为管理员
+  async isAdmin(userId: string): Promise<boolean> {
+    const roles = await roleService.getUserRoleCodes(userId);
+    return roles.includes('admin');
+  }
+
+  // 检查用户是否有权访问指定应用
+  async hasAppPermission(userId: string, appId: string): Promise<boolean> {
+    // 管理员默认拥有所有应用权限
+    if (await this.isAdmin(userId)) {
+      return true;
+    }
+
+    const client = getSupabaseClient();
+    const { data } = await client
+      .from('user_app_permissions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('app_id', appId)
+      .single();
+
+    return !!data;
+  }
+
+  // 获取用户授权的应用列表
+  async getUserApps(userId: string): Promise<any[]> {
+    const client = getSupabaseClient();
+
+    // 检查是否为管理员
+    const isAdmin = await this.isAdmin(userId);
+
+    // 获取所有应用
+    const { data: allApps, error } = await client
+      .from('oauth_clients')
+      .select('id, name, client_id, status, created_at')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`获取应用列表失败: ${error.message}`);
+    }
+
+    if (isAdmin) {
+      // 管理员拥有所有应用权限
+      return (allApps || []).map((app) => ({
+        ...app,
+        hasPermission: true,
+        isGrantedByDefault: true,
+      }));
+    }
+
+    // 获取用户已授权的应用
+    const { data: permissions } = await client
+      .from('user_app_permissions')
+      .select('app_id, granted_by, created_at')
+      .eq('user_id', userId);
+
+    const permissionMap = new Map(
+      (permissions || []).map((p) => [p.app_id, p]),
+    );
+
+    return (allApps || []).map((app) => ({
+      ...app,
+      hasPermission: permissionMap.has(app.id),
+      isGrantedByDefault: false,
+      grantedAt: permissionMap.get(app.id)?.created_at || null,
+    }));
+  }
+
+  // 授权用户访问应用
+  async grantAppPermission(
+    userId: string,
+    appId: string,
+    grantedBy: string,
+  ): Promise<void> {
+    const client = getSupabaseClient();
+
+    // 检查用户是否存在
+    const user = await userService.findById(userId);
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+
+    // 检查应用是否存在
+    const { data: app } = await client
+      .from('oauth_clients')
+      .select('id')
+      .eq('id', appId)
+      .single();
+
+    if (!app) {
+      throw new Error('应用不存在');
+    }
+
+    // 检查是否已授权
+    const { data: existing } = await client
+      .from('user_app_permissions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('app_id', appId)
+      .single();
+
+    if (existing) {
+      return; // 已授权，无需重复操作
+    }
+
+    // 创建授权记录
+    const { error } = await client.from('user_app_permissions').insert({
+      user_id: userId,
+      app_id: appId,
+      granted_by: grantedBy,
+    });
+
+    if (error) {
+      throw new Error(`授权失败: ${error.message}`);
+    }
+
+    await auditService.create({
+      event_type: 'app_permission_grant',
+      user_id: userId,
+      metadata: { app_id: appId, granted_by: grantedBy },
+    });
+  }
+
+  // 批量授权用户访问应用
+  async grantAppPermissions(
+    userId: string,
+    appIds: string[],
+    grantedBy: string,
+  ): Promise<void> {
+    for (const appId of appIds) {
+      await this.grantAppPermission(userId, appId, grantedBy);
+    }
+  }
+
+  // 取消用户应用授权
+  async revokeAppPermission(userId: string, appId: string): Promise<void> {
+    const client = getSupabaseClient();
+
+    // 管理员权限不可撤销（默认拥有）
+    if (await this.isAdmin(userId)) {
+      throw new Error('管理员默认拥有所有应用权限，无法撤销');
+    }
+
+    const { error } = await client
+      .from('user_app_permissions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('app_id', appId);
+
+    if (error) {
+      throw new Error(`撤销授权失败: ${error.message}`);
+    }
+
+    await auditService.create({
+      event_type: 'app_permission_revoke',
+      user_id: userId,
+      metadata: { app_id: appId },
+    });
+  }
+
+  // 获取应用的已授权用户列表
+  async getAppAuthorizedUsers(
+    appId: string,
+    page = 1,
+    pageSize = 20,
+  ): Promise<{ list: any[]; total: number }> {
+    const client = getSupabaseClient();
+
+    // 获取直接授权的用户
+    const {
+      data: permissions,
+      error,
+      count,
+    } = await client
+      .from('user_app_permissions')
+      .select(
+        'user_id, granted_by, created_at, users(id, username, email, nickname)',
+        { count: 'exact' },
+      )
+      .eq('app_id', appId)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
+
+    if (error) {
+      throw new Error(`获取授权用户失败: ${error.message}`);
+    }
+
+    // 获取管理员用户（默认拥有权限）
+    const { data: adminRoles } = await client
+      .from('roles')
+      .select('id')
+      .eq('code', 'admin');
+
+    let adminUsers: any[] = [];
+    if (adminRoles && adminRoles.length > 0) {
+      const adminRoleIds = adminRoles.map((r) => r.id);
+
+      // 查找拥有管理员角色的用户
+      const { data: userRoles } = await client
+        .from('users')
+        .select('id, username, email, nickname, metadata')
+        .contains('metadata->roles', adminRoleIds);
+
+      adminUsers = (userRoles || []).map((u) => ({
+        ...u,
+        isGrantedByDefault: true,
+        hasPermission: true,
+      }));
+    }
+
+    const authorizedUsers = (permissions || []).map((p: any) => ({
+      ...(p.users || {}),
+      granted_at: p.created_at,
+      granted_by: p.granted_by,
+      isGrantedByDefault: false,
+      hasPermission: true,
+    }));
+
+    return {
+      list: [...adminUsers, ...authorizedUsers],
+      total: (count || 0) + adminUsers.length,
+    };
+  }
 }
 
 export const usersService = new UsersService();

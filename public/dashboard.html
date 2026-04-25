@@ -413,9 +413,16 @@
                 <p class="font-medium text-gray-800">${user.username}</p>
                 <p class="text-sm text-gray-500">${user.email || '-'}</p>
               </div>
-              <span class="px-2 py-1 text-xs font-medium rounded ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}">
-                ${user.role === 'admin' ? '管理员' : '用户'}
-              </span>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-1 text-xs font-medium rounded ${user.role === 'admin' || (user.roles && user.roles.some(r => r.code === 'admin')) ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}">
+                  ${user.role === 'admin' || (user.roles && user.roles.some(r => r.code === 'admin')) ? '管理员' : '用户'}
+                </span>
+                <button onclick="showUserAppsModal('${user.id}')" class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="管理应用权限">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -699,6 +706,181 @@
     function logout() {
       Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
       window.location.href = '/login.html';
+    }
+
+    // ==================== 用户应用授权管理 ====================
+    let currentUserApps = null;
+    let currentUserForApps = null;
+
+    async function showUserAppsModal(userId) {
+      currentUserForApps = users.find(u => u.id === userId);
+      if (!currentUserForApps) return;
+
+      // 显示模态框
+      const modalHtml = `
+        <div id="user-apps-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-fade-in">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-800">管理应用权限</h3>
+                <p class="text-sm text-gray-500 mt-1">用户: ${currentUserForApps.username}</p>
+              </div>
+              <button onclick="document.getElementById('user-apps-modal').remove()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <div id="user-apps-content" class="p-6 overflow-y-auto" style="max-height: 60vh;">
+              <div class="text-center py-8 text-gray-500">
+                <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                加载中...
+              </div>
+            </div>
+            <div class="p-4 border-t border-gray-100 flex justify-end">
+              <button onclick="document.getElementById('user-apps-modal').remove()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+      // 加载用户应用权限
+      try {
+        const res = await fetch(`${API}/api/users/${userId}/apps`, {
+          headers: getHeaders(),
+        });
+        
+        if (!res.ok) {
+          throw new Error('加载失败');
+        }
+        
+        const data = await res.json();
+        currentUserApps = data.data || data || [];
+        renderUserAppsModal();
+      } catch (err) {
+        console.error('加载用户应用权限失败:', err);
+        document.getElementById('user-apps-content').innerHTML = `
+          <div class="text-center py-8 text-red-500">
+            <p>加载失败，请重试</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderUserAppsModal() {
+      const container = document.getElementById('user-apps-content');
+      const isAdmin = currentUserForApps.role === 'admin' || 
+                      (currentUserForApps.roles && currentUserForApps.roles.some(r => r.code === 'admin'));
+
+      if (currentUserApps.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+            </svg>
+            <p>暂无可用的应用</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        ${isAdmin ? `
+          <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+              <span class="text-purple-800 font-medium">管理员默认拥有所有应用权限</span>
+            </div>
+          </div>
+        ` : ''}
+        <div class="space-y-3">
+          ${currentUserApps.map(app => `
+            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-indigo-200 transition-colors">
+              <div>
+                <h4 class="font-medium text-gray-800">${app.name}</h4>
+                <p class="text-sm text-gray-500">${app.client_id || app.clientId || ''}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                ${app.hasPermission ? `
+                  <span class="px-3 py-1 text-sm font-medium rounded-full ${app.isGrantedByDefault ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}">
+                    ${app.isGrantedByDefault ? '默认授权' : '已授权'}
+                  </span>
+                  ${!app.isGrantedByDefault && !isAdmin ? `
+                    <button onclick="revokeAppPermission('${currentUserForApps.id}', '${app.id}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="取消授权">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                      </svg>
+                    </button>
+                  ` : ''}
+                ` : `
+                  <button onclick="grantAppPermission('${currentUserForApps.id}', '${app.id}')" class="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                    授权
+                  </button>
+                `}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    async function grantAppPermission(userId, appId) {
+      try {
+        const res = await fetch(`${API}/api/users/${userId}/apps`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ appId }),
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok || data.success) {
+          // 更新本地数据
+          const appIndex = currentUserApps.findIndex(a => a.id === appId);
+          if (appIndex !== -1) {
+            currentUserApps[appIndex].hasPermission = true;
+          }
+          renderUserAppsModal();
+        } else {
+          alert(data.message || '授权失败');
+        }
+      } catch (err) {
+        console.error('授权失败:', err);
+        alert('授权失败');
+      }
+    }
+
+    async function revokeAppPermission(userId, appId) {
+      if (!confirm('确定要取消该用户对此应用的访问权限吗？')) return;
+      
+      try {
+        const res = await fetch(`${API}/api/users/${userId}/apps/${appId}`, {
+          method: 'DELETE',
+          headers: getHeaders(),
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok || data.success) {
+          // 更新本地数据
+          const appIndex = currentUserApps.findIndex(a => a.id === appId);
+          if (appIndex !== -1) {
+            currentUserApps[appIndex].hasPermission = false;
+          }
+          renderUserAppsModal();
+        } else {
+          alert(data.message || '取消授权失败');
+        }
+      } catch (err) {
+        console.error('取消授权失败:', err);
+        alert('取消授权失败');
+      }
     }
 
     init();
