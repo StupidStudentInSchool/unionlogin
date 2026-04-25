@@ -555,14 +555,21 @@ export class UsersService {
   async getUserApps(userId: string): Promise<any[]> {
     const client = getSupabaseClient();
 
+    // 获取用户信息（包含租户ID）
+    const user = await userService.findById(userId);
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+
     // 检查是否为管理员
     const isAdmin = await this.isAdmin(userId);
 
-    // 获取所有应用
+    // 获取该租户的应用列表
     const { data: allApps, error } = await client
       .from('oauth_clients')
       .select('id, name, client_id, status, created_at')
       .eq('status', 'active')
+      .eq('tenant_id', user.tenant_id)
       .order('created_at', { ascending: false });
 
     if (error) {
