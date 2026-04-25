@@ -18,14 +18,14 @@ import { AuthGuard } from '../../common/guards/auth.guard';
 @ApiTags('应用管理')
 @Controller('api/apps')
 export class AppsController {
-  @Public()
+  @UseGuards(AuthGuard)
   @Post()
-  @ApiOperation({ summary: '创建应用（无需认证）' })
+  @ApiOperation({ summary: '创建应用' })
   async createApp(
     @Body() body: { name: string; redirectUris: string[]; scopes?: string[] },
     @Req() req: Request,
   ) {
-    const tenantId = (req as any).tenantId;
+    const tenantId = (req as any).tenantId || (req.headers['x-tenant-id'] as string);
     const result = await appsService.createApp({ ...body, tenantId });
     
     return {
@@ -37,6 +37,7 @@ export class AppsController {
         scopes: result.app.scopes,
         status: result.app.status,
         created_at: result.app.created_at,
+        tenant_id: result.app.tenant_id,
       },
       clientSecret: result.clientSecret,
     };
@@ -63,15 +64,16 @@ export class AppsController {
     @Body() body: { name?: string; redirectUris?: string[]; scopes?: string[] },
     @Req() req: Request,
   ) {
-    const tenantId = (req as any).tenantId;
-    return appsService.updateApp(clientId, body, tenantId);
+    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).tenantId;
+    const result = await appsService.updateApp(clientId, body, tenantId);
+    return { success: true, data: result };
   }
 
   @Delete(':clientId')
   @ApiOperation({ summary: '删除应用' })
   async deleteApp(@Param('clientId') clientId: string, @Req() req: Request) {
-    const tenantId = (req as any).tenantId;
+    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).tenantId;
     await appsService.deleteApp(clientId, tenantId);
-    return { success: true };
+    return { success: true, message: '删除成功' };
   }
 }

@@ -24,12 +24,8 @@ export class AppsService {
       scopes: data.scopes || ['openid', 'profile', 'email'],
       grant_types: ['authorization_code', 'refresh_token'],
       status: 'active',
+      tenant_id: data.tenantId, // 必须设置 tenant_id
     };
-    
-    // 只有当 tenantId 有效时才设置
-    if (data.tenantId && data.tenantId !== 'default') {
-      insertData.tenant_id = data.tenantId;
-    }
 
     const app = await oauthClientService.create(insertData);
 
