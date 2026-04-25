@@ -19,14 +19,22 @@ export class UserService {
     return data as User | null;
   }
 
-  async findByUsername(username: string): Promise<User | null> {
-    const { data, error } = await this.client.from('users').select('*').eq('username', username).maybeSingle();
+  async findByUsername(username: string, tenantId?: string): Promise<User | null> {
+    let query = this.client.from('users').select('*').eq('username', username);
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    const { data, error } = await query.maybeSingle();
     if (error) throw new Error(`查询用户失败: ${error.message}`);
     return data as User | null;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    const { data, error } = await this.client.from('users').select('*').eq('email', email).maybeSingle();
+  async findByEmail(email: string, tenantId?: string): Promise<User | null> {
+    let query = this.client.from('users').select('*').eq('email', email);
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    const { data, error } = await query.maybeSingle();
     if (error) throw new Error(`查询用户失败: ${error.message}`);
     return data as User | null;
   }

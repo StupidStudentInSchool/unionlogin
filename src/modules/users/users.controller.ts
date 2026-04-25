@@ -37,11 +37,12 @@ export class UsersController {
     @Req() req: Request,
   ) {
     const ipAddress = (req.headers['x-forwarded-for'] as string) || '';
+    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
     const loginData = {
       login: body.login || body.email || '',
       password: body.password,
     };
-    return usersService.login(loginData, ipAddress, req.headers['user-agent']);
+    return usersService.login(loginData, ipAddress, req.headers['user-agent'], tenantId);
   }
 
   @UseGuards(AuthGuard)

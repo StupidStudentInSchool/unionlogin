@@ -61,11 +61,11 @@ export class UsersService {
   async login(data: {
     login: string;
     password: string;
-  }, ipAddress?: string, userAgent?: string): Promise<{ user: User; accessToken?: string; refreshToken?: string }> {
-    // 支持用户名或邮箱登录
-    let user = await userService.findByUsername(data.login);
+  }, ipAddress?: string, userAgent?: string, tenantId?: string): Promise<{ user: User; accessToken?: string; refreshToken?: string }> {
+    // 支持用户名或邮箱登录（按租户过滤）
+    let user = await userService.findByUsername(data.login, tenantId);
     if (!user) {
-      user = await userService.findByEmail(data.login);
+      user = await userService.findByEmail(data.login, tenantId);
     }
 
     if (!user) {
