@@ -145,19 +145,18 @@
           headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
           body: JSON.stringify({ login: username, password }),
         });
-        const data = await res.json();
-        const loginData = data.data || {};
+        const loginData = data.success ? (data.data || {}) : data;
 
         if (loginData.accessToken) {
           // 优先使用登录响应中的 tenant_id，而不是下拉框选择的
           const actualTenantId = loginData.user?.tenant_id || tenantId;
-          localStorage.setItem(STORAGE_KEYS.token, loginData.accessToken);
-          localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken);
-          localStorage.setItem(STORAGE_KEYS.tenant, actualTenantId);
-          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user));
+          localStorage.setItem(STORAGE_KEYS.token, loginData.accessToken || '');
+          localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken || '');
+          localStorage.setItem(STORAGE_KEYS.tenant, actualTenantId || '');
+          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user || {}));
           window.location.href = '/dashboard.html';
         } else {
-          showError(data.message || data.data?.message || '登录失败');
+          showError(data.message || '登录失败');
         }
       } catch (err) {
         showError('登录失败，请稍后重试');
