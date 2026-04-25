@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Identity Center - 对接指南</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    .prose pre { padding: 0; }
+    .prose code { font-size: 0.875em; }
+    .prose pre code { font-size: 0.8125em; }
+    .api-method { font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .method-get { background: #10b981; color: white; }
+    .method-post { background: #3b82f6; color: white; }
+    .method-put { background: #f59e0b; color: white; }
+    .method-delete { background: #ef4444; color: white; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-4xl mx-auto py-8 px-4">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">Identity Center 对接指南</h1>
+      <p class="mt-2 text-gray-600">本文档帮助第三方系统接入统一身份认证中心</p>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav class="sticky top-4 mb-8 p-4 bg-white rounded-xl shadow-sm border border-gray-200">
+      <div class="flex flex-wrap gap-2 text-sm">
+        <a href="#overview" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">系统概述</a>
+        <a href="#flow" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">接入流程</a>
+        <a href="#oauth" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">OAuth 2.0</a>
+        <a href="#api" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">API 接口</a>
+        <a href="#userinfo" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">用户信息</a>
+        <a href="#example" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">示例代码</a>
+        <a href="#token" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">Token 管理</a>
+        <a href="#faq" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">常见问题</a>
+      </div>
+    </nav>
+
+    <!-- Dynamic Config -->
+    <div class="mb-8 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="font-semibold text-indigo-800">当前认证中心配置</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <div class="bg-white p-3 rounded-lg">
+          <div class="text-gray-500 mb-1">认证中心地址</div>
+          <code id="config-base-url" class="text-indigo-600 font-mono">加载中...</code>
+        </div>
+        <div class="bg-white p-3 rounded-lg">
+          <div class="text-gray-500 mb-1">API 文档</div>
+          <code id="config-api-docs" class="text-indigo-600 font-mono">加载中...</code>
+        </div>
+        <div class="bg-white p-3 rounded-lg">
+          <div class="text-gray-500 mb-1">授权端点</div>
+          <code id="config-authorize" class="text-indigo-600 font-mono">加载中...</code>
+        </div>
+        <div class="bg-white p-3 rounded-lg">
+          <div class="text-gray-500 mb-1">Token 端点</div>
+          <code id="config-token" class="text-indigo-600 font-mono">加载中...</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="prose prose-indigo max-w-none">
+      <!-- Section 1: System Overview -->
+      <section id="overview" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">1</span>
+          系统概述
+        </h2>
+        <p class="text-gray-600 mb-4">Identity Center 是一个基于 <strong>OAuth 2.0 / OIDC 协议</strong>的统一身份认证中心，为所有业务应用提供：</p>
+        <ul class="space-y-2 text-gray-600">
+          <li class="flex items-center gap-2"><span class="text-green-500">✓</span> <strong>统一用户管理</strong>：用户只需一个账号即可访问所有接入系统</li>
+          <li class="flex items-center gap-2"><span class="text-green-500">✓</span> <strong>单点登录 (SSO)</strong>：一次登录，多处通行</li>
+          <li class="flex items-center gap-2"><span class="text-green-500">✓</span> <strong>多租户支持</strong>：支持企业级多租户隔离</li>
+          <li class="flex items-center gap-2"><span class="text-green-500">✓</span> <strong>第三方登录</strong>：支持 GitHub、Google、微信等第三方账号登录</li>
+          <li class="flex items-center gap-2"><span class="text-green-500">✓</span> <strong>权限管理</strong>：统一的角色和权限控制</li>
+        </ul>
+      </section>
+
+      <!-- Section 2: Integration Flow -->
+      <section id="flow" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">2</span>
+          接入流程
+        </h2>
+        
+        <div class="space-y-4">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">1</div>
+            <div>
+              <h3 class="font-semibold text-gray-900">注册应用</h3>
+              <p class="text-gray-600 text-sm">在 Identity Center 管理后台创建应用，获取 <code class="bg-gray-100 px-1 rounded">client_id</code> 和 <code class="bg-gray-100 px-1 rounded">client_secret</code></p>
+            </div>
+          </div>
+          
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">2</div>
+            <div>
+              <h3 class="font-semibold text-gray-900">配置回调地址</h3>
+              <p class="text-gray-600 text-sm">设置 <code class="bg-gray-100 px-1 rounded">redirect_uri</code>，必须与实际请求完全一致</p>
+            </div>
+          </div>
+          
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">3</div>
+            <div>
+              <h3 class="font-semibold text-gray-900">实现 OAuth 2.0 流程</h3>
+              <p class="text-gray-600 text-sm">按照授权码流程实现登录逻辑</p>
+            </div>
+          </div>
+          
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">4</div>
+            <div>
+              <h3 class="font-semibold text-gray-900">获取用户信息</h3>
+              <p class="text-gray-600 text-sm">使用 Access Token 获取用户信息并创建本地会话</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warning about Client Secret -->
+        <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <div>
+              <h4 class="font-semibold text-yellow-800">关于 Client Secret</h4>
+              <p class="text-sm text-yellow-700 mt-1">Client Secret 可以随时在管理后台查看：进入"应用管理" → 点击应用的"查看密钥"按钮即可获取。建议使用环境变量存储，不要提交到代码仓库。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: OAuth 2.0 Flow -->
+      <section id="oauth" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">3</span>
+          OAuth 2.0 授权码流程
+        </h2>
+
+        <!-- Flow Diagram -->
+        <div class="bg-gray-900 text-gray-100 p-4 rounded-lg mb-6 text-sm font-mono overflow-x-auto">
+<pre>
+用户浏览器          第三方应用          Identity Center
+    │                  │                     │
+    │  1. 点击登录     │                     │
+    │ ───────────────> │                     │
+    │                  │                     │
+    │  2. 重定向到授权页面                  │
+    │ <─────────────────────────────────────│
+    │                  │                     │
+    │  3. 用户登录并授权                    │
+    │ ─────────────────────────────────────>│
+    │                  │                     │
+    │  4. 重定向回应用（携带授权码）        │
+    │ <─────────────────────────────────────│
+    │                  │                     │
+    │                  │ 5. 用授权码换Token  │
+    │                  │ ───────────────────>│
+    │                  │                     │
+    │                  │ 6. 返回 Access Token
+    │                  │ <───────────────────│
+    │                  │                     │
+    │                  │ 7. 获取用户信息     │
+    │                  │ ───────────────────>│
+    │                  │                     │
+    │  8. 登录成功     │                     │
+    │ <─────────────── │                     │
+</pre>
+        </div>
+
+        <!-- Step 1: Authorization -->
+        <div class="mb-6">
+          <h3 class="font-semibold text-gray-900 mb-2">步骤 1：引导用户授权</h3>
+          <p class="text-gray-600 text-sm mb-3">将用户重定向到授权端点：</p>
+          <div class="relative">
+            <pre class="!bg-gray-900 !text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code class="language-http" id="example-authorize-url">GET /api/auth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=openid profile email&state={state}</code></pre>
+          </div>
+          
+          <div class="mt-3 overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-gray-700">参数</th>
+                  <th class="px-3 py-2 text-left text-gray-700">必填</th>
+                  <th class="px-3 py-2 text-left text-gray-700">说明</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">
+                <tr><td class="px-3 py-2 font-mono text-indigo-600">client_id</td><td class="px-3 py-2">是</td><td class="px-3 py-2 text-gray-600">应用唯一标识</td></tr>
+                <tr><td class="px-3 py-2 font-mono text-indigo-600">redirect_uri</td><td class="px-3 py-2">是</td><td class="px-3 py-2 text-gray-600">授权回调地址，必须与注册时一致</td></tr>
+                <tr><td class="px-3 py-2 font-mono text-indigo-600">response_type</td><td class="px-3 py-2">是</td><td class="px-3 py-2 text-gray-600">固定值 <code>code</code></td></tr>
+                <tr><td class="px-3 py-2 font-mono text-indigo-600">scope</td><td class="px-3 py-2">否</td><td class="px-3 py-2 text-gray-600">权限范围，默认 <code>openid profile email</code></td></tr>
+                <tr><td class="px-3 py-2 font-mono text-indigo-600">state</td><td class="px-3 py-2">推荐</td><td class="px-3 py-2 text-gray-600">防 CSRF 攻击的随机字符串</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Step 2: Receive Code -->
+        <div class="mb-6">
+          <h3 class="font-semibold text-gray-900 mb-2">步骤 2：接收授权码</h3>
+          <p class="text-gray-600 text-sm mb-3">用户授权后，系统重定向回您的回调地址：</p>
+          <pre class="!bg-gray-900 !text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code class="language-http">GET https://your-app.com/callback?code={authorization_code}&state={state}</code></pre>
+          <p class="text-gray-600 text-sm mt-2">⚠️ 请验证返回的 <code>state</code> 是否与发送的一致，防止 CSRF 攻击</p>
+        </div>
+
+        <!-- Step 3: Exchange Token -->
+        <div class="mb-6">
+          <h3 class="font-semibold text-gray-900 mb-2">步骤 3：换取 Access Token</h3>
+          <p class="text-gray-600 text-sm mb-3">在后端服务中使用授权码换取 Token：</p>
+          <pre class="!bg-gray-900 !text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code class="language-http" id="example-token-request">POST /api/auth/token
+Content-Type: application/json
+
+{
+  "grant_type": "authorization_code",
+  "client_id": "your_client_id",
+  "client_secret": "your_client_secret",
+  "code": "authorization_code",
+  "redirect_uri": "https://your-app.com/callback"
+}</code></pre>
+          
+          <p class="text-gray-600 text-sm mt-3 mb-2">响应示例：</p>
+          <pre class="!bg-gray-900 !text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code class="language-json">{
+  "accessToken": "at_01b0df5d-850d-4637-a03f-4f262da208d1",
+  "refreshToken": "rt_02c1eg6e-961e-5748-b14g-5g373eb319e2",
+  "expiresIn": 3600,
+  "tokenType": "Bearer"
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- Section 4: API Endpoints -->
+      <section id="api" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">4</span>
+          API 接口说明
+        </h2>
+
+        <div class="space-y-4">
+          <!-- API Table -->
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-gray-700">接口</th>
+                  <th class="px-3 py-2 text-left text-gray-700">方法</th>
+                  <th class="px-3 py-2 text-left text-gray-700">说明</th>
+                  <th class="px-3 py-2 text-left text-gray-700">认证</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">
+                <tr>
+                  <td class="px-3 py-2 font-mono text-indigo-600">/api/auth/authorize</td>
+                  <td class="px-3 py-2"><span class="api-method method-get">GET</span></td>
+                  <td class="px-3 py-2 text-gray-600">OAuth 授权入口</td>
+                  <td class="px-3 py-2 text-gray-600">可选</td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2 font-mono text-indigo-600">/api/auth/token</td>
+                  <td class="px-3 py-2"><span class="api-method method-post">POST</span></td>
+                  <td class="px-3 py-2 text-gray-600">换取/刷新 Token</td>
+                  <td class="px-3 py-2 text-gray-600">否</td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2 font-mono text-indigo-600">/api/auth/userinfo</td>
+                  <td class="px-3 py-2"><span class="api-method method-get">GET</span></td>
+                  <td class="px-3 py-2 text-gray-600">获取用户信息</td>
+                  <td class="px-3 py-2 text-gray-600">是</td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2 font-mono text-indigo-600">/api/auth/introspect</td>
+                  <td class="px-3 py-2"><span class="api-method method-post">POST</span></td>
+                  <td class="px-3 py-2 text-gray-600">验证 Token 有效性</td>
+                  <td class="px-3 py-2 text-gray-600">否</td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2 font-mono text-indigo-600">/api/auth/revoke</td>
+                  <td class="px-3 py-2"><span class="api-method method-post">POST</span></td>
+                  <td class="px-3 py-2 text-gray-600">撤销 Token</td>
+                  <td class="px-3 py-2 text-gray-600">否</td>
+                </tr>
+                <tr>
+                  <td class="px-3 py-2 font-mono text-indigo-600">/api/auth/logout</td>
+                  <td class="px-3 py-2"><span class="api-method method-post">POST</span></td>
+                  <td class="px-3 py-2 text-gray-600">单点登出</td>
+                  <td class="px-3 py-2 text-gray-600">是</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- API Details -->
+          <div class="mt-6 space-y-4">
+            <div class="p-4 bg-gray-50 rounded-lg">
+              <h4 class="font-semibold text-gray-900 mb-2">获取用户信息</h4>
+              <pre class="!bg-gray-900 !text-gray-100 p-3 rounded text-sm overflow-x-auto"><code class="language-http" id="example-userinfo">GET /api/auth/userinfo
+Authorization: Bearer {access_token}</code></pre>
+              <pre class="!bg-gray-900 !text-gray-100 p-3 rounded text-sm mt-2 overflow-x-auto"><code class="language-json">{
+  "id": "2be9782d-c5a9-426f-a8b1-64cd622adcfa",
+  "username": "admin",
+  "email": "admin@example.com",
+  "nickname": "管理员",
+  "avatar": "https://..."
+}</code></pre>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg">
+              <h4 class="font-semibold text-gray-900 mb-2">刷新 Token</h4>
+              <pre class="!bg-gray-900 !text-gray-100 p-3 rounded text-sm overflow-x-auto"><code class="language-json">POST /api/auth/token
+Content-Type: application/json
+
+{
+  "grant_type": "refresh_token",
+  "refresh_token": "your_refresh_token"
+}</code></pre>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-lg">
+              <h4 class="font-semibold text-gray-900 mb-2">验证 Token</h4>
+              <pre class="!bg-gray-900 !text-gray-100 p-3 rounded text-sm overflow-x-auto"><code class="language-json">POST /api/auth/introspect
+Content-Type: application/json
+
+{
+  "token": "access_token"
+}</code></pre>
+              <p class="text-sm text-gray-600 mt-2">返回 <code>{"active": true}</code> 或 <code>{"active": false}</code></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: User Info -->
+      <section id="userinfo" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">5</span>
+          获取的用户信息
+        </h2>
+
+        <p class="text-gray-600 mb-4">通过 <code class="bg-gray-100 px-1 rounded">/api/auth/userinfo</code> 接口可获取以下用户基本信息：</p>
+        
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-gray-700">字段</th>
+                <th class="px-3 py-2 text-left text-gray-700">类型</th>
+                <th class="px-3 py-2 text-left text-gray-700">说明</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr><td class="px-3 py-2 font-mono text-indigo-600">id</td><td class="px-3 py-2">string</td><td class="px-3 py-2 text-gray-600">用户唯一标识（UUID）</td></tr>
+              <tr><td class="px-3 py-2 font-mono text-indigo-600">username</td><td class="px-3 py-2">string</td><td class="px-3 py-2 text-gray-600">用户名</td></tr>
+              <tr><td class="px-3 py-2 font-mono text-indigo-600">email</td><td class="px-3 py-2">string</td><td class="px-3 py-2 text-gray-600">邮箱地址</td></tr>
+              <tr><td class="px-3 py-2 font-mono text-indigo-600">nickname</td><td class="px-3 py-2">string</td><td class="px-3 py-2 text-gray-600">昵称</td></tr>
+              <tr><td class="px-3 py-2 font-mono text-indigo-600">avatar</td><td class="px-3 py-2">string</td><td class="px-3 py-2 text-gray-600">头像 URL</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section 6: Example Code -->
+      <section id="example" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">6</span>
+          接入示例代码
+        </h2>
+
+        <div class="space-y-4">
+          <!-- Node.js Example -->
+          <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="bg-gray-100 px-4 py-2 font-semibold text-gray-700">Node.js / Express</div>
+            <pre class="!bg-gray-900 !text-gray-100 p-4 text-sm overflow-x-auto max-h-96"><code class="language-javascript">// config.js - 配置信息
+const config = {
+  IDC_BASE_URL: window.IDC_CONFIG.baseUrl,
+  CLIENT_ID: 'your_client_id',
+  CLIENT_SECRET: 'your_client_secret',
+  REDIRECT_URI: 'https://your-app.com/callback',
+};
+
+// 登录入口
+router.get('/login', (req, res) => {
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.oauth_state = state;
+
+  const authUrl = `${config.IDC_BASE_URL}/api/auth/authorize?` +
+    `client_id=${config.CLIENT_ID}&` +
+    `redirect_uri=${encodeURIComponent(config.REDIRECT_URI)}&` +
+    `response_type=code&` +
+    `scope=openid profile email&` +
+    `state=${state}`;
+
+  res.redirect(authUrl);
+});
+
+// OAuth 回调
+router.get('/callback', async (req, res) => {
+  const { code, state } = req.query;
+
+  // 验证 state
+  if (state !== req.session.oauth_state) {
+    return res.status(400).send('Invalid state');
+  }
+
+  // 换取 Token
+  const tokenRes = await fetch(`${config.IDC_BASE_URL}/api/auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'authorization_code',
+      client_id: config.CLIENT_ID,
+      client_secret: config.CLIENT_SECRET,
+      code,
+      redirect_uri: config.REDIRECT_URI,
+    }),
+  });
+  
+  const tokens = await tokenRes.json();
+
+  // 获取用户信息
+  const userRes = await fetch(`${config.IDC_BASE_URL}/api/auth/userinfo`, {
+    headers: { Authorization: `Bearer ${tokens.accessToken}` },
+  });
+  
+  const user = await userRes.json();
+  
+  // 创建本地会话
+  req.session.user = user;
+  res.redirect('/dashboard');
+});</code></pre>
+          </div>
+
+          <!-- Python Example -->
+          <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="bg-gray-100 px-4 py-2 font-semibold text-gray-700">Python / Flask</div>
+            <pre class="!bg-gray-900 !text-gray-100 p-4 text-sm overflow-x-auto max-h-96"><code class="language-python">import secrets
+import requests
+from flask import Blueprint, request, redirect, session
+
+auth_bp = Blueprint('auth', __name__)
+
+IDC_BASE_URL = 'YOUR_IDC_BASE_URL'  # 从页面配置获取
+CLIENT_ID = 'your_client_id'
+CLIENT_SECRET = 'your_client_secret'
+REDIRECT_URI = 'https://your-app.com/callback'
+
+@auth_bp.route('/login')
+def login():
+    state = secrets.token_hex(16)
+    session['oauth_state'] = state
+    
+    auth_url = f"{IDC_BASE_URL}/api/auth/authorize?" + \
+               f"client_id={CLIENT_ID}&" + \
+               f"redirect_uri={REDIRECT_URI}&" + \
+               f"response_type=code&" + \
+               f"scope=openid profile email&" + \
+               f"state={state}"
+    
+    return redirect(auth_url)
+
+@auth_bp.route('/callback')
+def callback():
+    code = request.args.get('code')
+    state = request.args.get('state')
+    
+    if state != session.get('oauth_state'):
+        return 'Invalid state', 400
+    
+    # 换取 Token
+    token_res = requests.post(f"{IDC_BASE_URL}/api/auth/token", json={
+        'grant_type': 'authorization_code',
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'code': code,
+        'redirect_uri': REDIRECT_URI,
+    })
+    
+    tokens = token_res.json()
+    
+    # 获取用户信息
+    user_res = requests.get(
+        f"{IDC_BASE_URL}/api/auth/userinfo",
+        headers={'Authorization': f"Bearer {tokens['accessToken']}"}
+    )
+    
+    user = user_res.json()
+    session['user'] = user
+    
+    return redirect('/dashboard')</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 7: Token Management -->
+      <section id="token" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">7</span>
+          Token 管理
+        </h2>
+
+        <div class="overflow-x-auto mb-4">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-gray-700">Token 类型</th>
+                <th class="px-3 py-2 text-left text-gray-700">有效期</th>
+                <th class="px-3 py-2 text-left text-gray-700">说明</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr><td class="px-3 py-2 font-medium">Authorization Code</td><td class="px-3 py-2">5 分钟</td><td class="px-3 py-2 text-gray-600">一次性使用，用后即废</td></tr>
+              <tr><td class="px-3 py-2 font-medium">Access Token</td><td class="px-3 py-2">1 小时</td><td class="px-3 py-2 text-gray-600">用于访问 API</td></tr>
+              <tr><td class="px-3 py-2 font-medium">Refresh Token</td><td class="px-3 py-2">7 天</td><td class="px-3 py-2 text-gray-600">用于刷新 Access Token</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 class="font-semibold text-blue-800 mb-2">刷新 Token</h4>
+          <p class="text-sm text-blue-700 mb-2">当 Access Token 过期时，使用 Refresh Token 获取新的 Token：</p>
+          <pre class="!bg-gray-900 !text-gray-100 p-3 rounded text-sm overflow-x-auto"><code class="language-json">POST /api/auth/token
+Content-Type: application/json
+
+{
+  "grant_type": "refresh_token",
+  "refresh_token": "your_refresh_token"
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- Section 8: FAQ -->
+      <section id="faq" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold">8</span>
+          常见问题
+        </h2>
+
+        <div class="space-y-4">
+          <div class="border-b border-gray-200 pb-4">
+            <h4 class="font-semibold text-gray-900">Q: 授权码只能使用一次吗？</h4>
+            <p class="text-gray-600 text-sm mt-1">是的，授权码使用后会立即失效。如果重复使用会返回错误。</p>
+          </div>
+          
+          <div class="border-b border-gray-200 pb-4">
+            <h4 class="font-semibold text-gray-900">Q: Access Token 过期后怎么办？</h4>
+            <p class="text-gray-600 text-sm mt-1">使用 Refresh Token 刷新获取新的 Access Token。如果 Refresh Token 也过期了，需要用户重新登录。</p>
+          </div>
+          
+          <div class="border-b border-gray-200 pb-4">
+            <h4 class="font-semibold text-gray-900">Q: 如何实现单点登录？</h4>
+            <p class="text-gray-600 text-sm mt-1">用户在第一个应用登录后，Identity Center 会保持登录状态。当用户访问第二个应用时，直接完成授权，无需再次输入密码。</p>
+          </div>
+          
+          <div class="border-b border-gray-200 pb-4">
+            <h4 class="font-semibold text-gray-900">Q: Client Secret 忘记了怎么办？</h4>
+            <p class="text-gray-600 text-sm mt-1">在管理后台"应用管理"页面，点击应用旁边的"查看密钥"按钮即可随时查看 Client Secret。</p>
+          </div>
+          
+          <div>
+            <h4 class="font-semibold text-gray-900">Q: API 返回 401 错误怎么办？</h4>
+            <p class="text-gray-600 text-sm mt-1">检查：1) Access Token 是否正确传递；2) Token 是否已过期；3) Token 是否已被撤销。</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-8 pt-6 border-t border-gray-200 text-center text-gray-500 text-sm">
+      <p>Identity Center - 统一身份认证中心</p>
+      <p class="mt-1">如有问题，请联系技术支持</p>
+    </div>
+  </div>
+
+  <script>
+    // 动态获取当前域名并更新配置
+    (function() {
+      const baseUrl = window.location.origin;
+      
+      // 更新配置显示
+      document.getElementById('config-base-url').textContent = baseUrl;
+      document.getElementById('config-api-docs').textContent = baseUrl + '/api/docs';
+      document.getElementById('config-authorize').textContent = baseUrl + '/api/auth/authorize';
+      document.getElementById('config-token').textContent = baseUrl + '/api/auth/token';
+      
+      // 更新示例代码中的 URL
+      document.getElementById('example-authorize-url').textContent = 
+        `GET ${baseUrl}/api/auth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=openid profile email&state={state}`;
+      document.getElementById('example-token-request').textContent = 
+        `POST ${baseUrl}/api/auth/token\nContent-Type: application/json\n\n{\n  "grant_type": "authorization_code",\n  "client_id": "your_client_id",\n  "client_secret": "your_client_secret",\n  "code": "authorization_code",\n  "redirect_uri": "https://your-app.com/callback"\n}`;
+      document.getElementById('example-userinfo').textContent = 
+        `GET ${baseUrl}/api/auth/userinfo\nAuthorization: Bearer {access_token}`;
+      
+      // 全局配置
+      window.IDC_CONFIG = {
+        baseUrl: baseUrl,
+        authorizeUrl: baseUrl + '/api/auth/authorize',
+        tokenUrl: baseUrl + '/api/auth/token',
+        userInfoUrl: baseUrl + '/api/auth/userinfo',
+      };
+      
+      // 语法高亮
+      hljs.highlightAll();
+    })();
+  </script>
+</body>
+</html>

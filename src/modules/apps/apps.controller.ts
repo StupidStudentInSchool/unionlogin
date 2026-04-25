@@ -76,4 +76,19 @@ export class AppsController {
     await appsService.deleteApp(clientId, tenantId);
     return { success: true, message: '删除成功' };
   }
+
+  @UseGuards(AuthGuard)
+  @Get(':clientId/secret')
+  @ApiOperation({ summary: '获取应用密钥' })
+  async getAppSecret(@Param('clientId') clientId: string) {
+    const result = await appsService.getAppForAdmin(clientId);
+    return {
+      app: {
+        id: result.app.id,
+        name: result.app.name,
+        client_id: result.app.client_id,
+      },
+      clientSecret: result.clientSecret,
+    };
+  }
 }

@@ -151,7 +151,7 @@ if (error) throw new Error(`查询失败: ${error.message}`);
 
 ## 第三方系统对接
 
-详细的对接指南请参阅：[Integration Guide](./public/docs/integration-guide.md)
+详细的对接指南请参阅：[Integration Guide](./public/docs/integration.html)
 
 ### 快速对接流程
 
