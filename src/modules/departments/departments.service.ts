@@ -89,20 +89,31 @@ export class DepartmentsService {
    */
   async update(id: string, tenantId: string, dto: UpdateDepartmentDto): Promise<Department> {
     // 如果更改了父部门，需要重新计算层级
-    if (dto.parentId) {
-      const parent = await this.findOne(dto.parentId, tenantId);
-      if (parent) {
-        dto.parentId; // 保持更新
+    let level: number | undefined;
+    if (dto.parentId !== undefined) {
+      if (dto.parentId) {
+        const parent = await this.findOne(dto.parentId, tenantId);
+        if (parent) {
+          level = parent.level + 1;
+        }
+      } else {
+        level = 1; // 顶级部门
       }
     }
 
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+    
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.code !== undefined) updateData.code = dto.code;
+    if (dto.parentId !== undefined) updateData.parent_id = dto.parentId || null;
+    if (dto.sortOrder !== undefined) updateData.sort_order = dto.sortOrder;
+    if (level !== undefined) updateData.level = level;
+
     const { data, error } = await this.client
       .from('departments')
-      .update({
-        ...dto,
-        parent_id: dto.parentId,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .select()
