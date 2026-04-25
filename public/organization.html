@@ -201,10 +201,16 @@
     });
 
     function getHeaders() {
-      return {
+      const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
+      const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem(STORAGE_KEYS.token)}`
       };
+      // 只有 tenant 有效时才添加
+      if (tenant && tenant !== 'null' && tenant !== 'undefined') {
+        headers['x-tenant-id'] = tenant;
+      }
+      return headers;
     }
 
     function checkAuth() {
