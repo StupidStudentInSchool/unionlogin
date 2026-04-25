@@ -4,11 +4,12 @@
 
 1. [系统概述](#1-系统概述)
 2. [快速开始](#2-快速开始)
-3. [OAuth 2.0 对接](#3-oauth-20-对接)
-4. [API 接口参考](#4-api-接口参考)
-5. [SDK 对接示例](#5-sdk-对接示例)
-6. [第三方登录集成](#6-第三方登录集成)
-7. [常见问题](#7-常见问题)
+3. [用户体系设计](#3-用户体系设计)
+4. [OAuth 2.0 对接](#4-oauth-20-对接)
+5. [API 接口参考](#5-api-接口参考)
+6. [SDK 对接示例](#6-sdk-对接示例)
+7. [第三方登录集成](#7-第三方登录集成)
+8. [常见问题](#8-常见问题)
 
 ---
 
@@ -120,9 +121,322 @@ https://unionlogin.coze.site/api/docs
 
 ---
 
-## 3. OAuth 2.0 对接
+## 3. 用户体系设计
 
-### 3.1 对接流程
+### 3.1 统一用户池模式
+
+本系统采用**统一用户池**模式，所有用户统一在认证中心注册和管理，第三方应用不维护独立用户表。
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           统一用户池架构                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                    ┌─────────────────────────────┐
+                    │        认证中心 (IdP)        │
+                    │                             │
+                    │  ┌───────────────────────┐  │
+                    │  │      users 表         │  │
+                    │  │  - 统一用户数据        │  │
+                    │  │  - 所有应用共享        │  │
+                    │  └───────────────────────┘  │
+                    │                             │
+                    │  ┌───────────────────────┐  │
+                    │  │   user_sessions 表    │  │
+                    │  │  - 统一会话管理        │  │
+                    │  │  - 支持单点登出        │  │
+                    │  └───────────────────────┘  │
+                    └──────────────┬──────────────┘
+                                   │
+           ┌───────────────────────┼───────────────────────┐
+           │                       │                       │
+           ▼                       ▼                       ▼
+    ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+    │   App A     │         │   App B     │         │   App C     │
+    │             │         │             │         │             │
+    │ 不存用户表   │         │ 不存用户表   │         │ 不存用户表   │
+    │ 只存会话：   │         │ 只存会话：   │         │ 只存会话：   │
+    │ - user_id   │         │ - user_id   │         │ - user_id   │
+    │ - token     │         │ - token     │         │ - token     │
+    └─────────────┘         └─────────────┘         └─────────────┘
+```
+
+### 3.2 模式优势
+
+| 对比项 | 统一用户池 ✅ | 独立用户表 |
+|--------|-------------|-----------|
+| 用户体验 | 一个账号，全站通行 | 每个应用都要注册 |
+| 安全管理 | 密码策略统一管理 | 各应用标准不一 |
+| 开发成本 | 第三方应用无需处理注册逻辑 | 需要同步、关联逻辑 |
+| 数据一致性 | 用户信息唯一来源 | 容易出现数据不一致 |
+| 单点登出 | 天然支持 | 需要额外实现 |
+
+### 3.3 注册流程
+
+```
+用户 ──> 第三方应用 ──> 点击"注册" ──> 跳转认证中心注册页
+                                              │
+                                              ▼
+                                    ┌─────────────────┐
+                                    │   认证中心       │
+                                    │  注册页面        │
+                                    │                 │
+                                    │ - 用户名        │
+                                    │ - 邮箱          │
+                                    │ - 密码          │
+                                    │ - 手机号(可选)   │
+                                    └────────┬────────┘
+                                             │
+                                             ▼
+                                    ┌─────────────────┐
+                                    │   创建用户       │
+                                    │  (users 表)      │
+                                    └────────┬────────┘
+                                             │
+                     ┌───────────────────────┴───────────────────────┐
+                     │                                               │
+                     ▼                                               ▼
+            ┌─────────────────┐                           ┌─────────────────┐
+            │  自动登录        │                           │  记录审计日志    │
+            │  创建会话        │                           │  (audit_logs)   │
+            └────────┬────────┘                           └─────────────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │ 重定向回应用      │
+            │ 携带授权码       │
+            └────────┬────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           回到第三方应用                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │ 用授权码换Token  │
+            │ 获取用户信息     │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │ 创建本地会话     │
+            │ 存储:           │
+            │ - user_id       │
+            │ - access_token  │
+            └─────────────────┘
+```
+
+### 3.4 登录流程（完整业务链路）
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Step 1: 发起登录                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+用户 ──> [应用 A] ──> 点击"登录" ──> 生成 state 参数，存储到 session
+                                           │
+                                           ▼
+                            GET /api/auth/authorize?
+                                client_id=app_a_id&
+                                redirect_uri=https://app-a.com/callback&
+                                response_type=code&
+                                scope=openid profile email&
+                                state=xyz123
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Step 2: 认证中心处理                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                              ┌─────────────────┐
+                              │   认证中心       │
+                              └────────┬────────┘
+                                       │
+                               ┌───────┴───────┐
+                               │               │
+                          [已登录]         [未登录]
+                               │               │
+                               │               ▼
+                               │    ┌─────────────────┐
+                               │    │   显示登录页     │
+                               │    │  /login.html    │
+                               │    └────────┬────────┘
+                               │             │
+                               │             ▼
+                               │    ┌─────────────────┐
+                               │    │ 验证用户凭证     │
+                               │    │ 创建用户会话     │
+                               │    └────────┬────────┘
+                               │             │
+                               └──────┬──────┘
+                                      │
+                                      ▼
+                             ┌─────────────────┐
+                             │ 检查授权记录     │
+                             └────────┬────────┘
+                                      │
+                              ┌───────┴───────┐
+                              │               │
+                        [已授权过]        [首次授权]
+                              │               │
+                              │               ▼
+                              │    ┌─────────────────┐
+                              │    │   显示授权页     │
+                              │    │ [同意] [拒绝]    │
+                              │    └────────┬────────┘
+                              │             │
+                              └──────┬──────┘
+                                     │
+                                     ▼
+                            ┌─────────────────┐
+                            │ 生成授权码       │
+                            │ 5分钟有效        │
+                            └────────┬────────┘
+                                     │
+                                     ▼
+                            ┌─────────────────┐
+                            │ 重定向回应用      │
+                            │ ?code=xxx&state=xxx
+                            └─────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Step 3: 应用处理回调                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                                     │
+                    ┌────────────────┼────────────────┐
+                    │                │                │
+                    ▼                ▼                ▼
+            ┌───────────┐    ┌───────────┐    ┌───────────┐
+            │验证 state │    │用 code 换 │    │获取用户信息│
+            │防止CSRF   │    │  Token    │    │           │
+            └───────────┘    └───────────┘    └───────────┘
+                                     │
+                                     ▼
+                            ┌─────────────────┐
+                            │ 创建应用会话      │
+                            │ 只存储:          │
+                            │ - user_id       │
+                            │ - access_token  │
+                            └────────┬────────┘
+                                     │
+                                     ▼
+                            ┌─────────────────┐
+                            │ 登录完成         │
+                            └─────────────────┘
+```
+
+### 3.5 单点登录 (SSO)
+
+用户已在 App A 登录，访问 App B 时无需再次登录：
+
+```
+用户 → App B → 点击"登录" → OAuth 授权流程
+                                    │
+                                    ▼
+                          ┌─────────────────┐
+                          │ 认证中心检测到   │
+                          │ 用户已登录       │
+                          └────────┬────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │ 直接返回授权码   │
+                          │ 无需再次登录     │
+                          └────────┬────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │ App B 获取 Token │
+                          │ 用户无缝登录     │
+                          └─────────────────┘
+```
+
+### 3.6 单点登出
+
+用户在任一应用登出，所有应用会话同步失效：
+
+```
+用户 → App A → 点击"登出"
+                    │
+                    ▼
+           ┌─────────────────┐
+           │ 调用认证中心     │
+           │ /api/auth/logout │
+           └────────┬────────┘
+                    │
+                    ▼
+           ┌─────────────────┐
+           │ 撤销 Token       │
+           │ 删除会话记录     │
+           └────────┬────────┘
+                    │
+                    ▼
+           ┌─────────────────┐
+           │ 所有应用的会话   │
+           │ 都已失效        │
+           └─────────────────┘
+```
+
+### 3.7 第三方应用接入步骤
+
+第三方应用只需要做两件事：
+
+**1. 登录入口 - 跳转到认证中心**
+
+```javascript
+function login() {
+  const state = generateRandomState();
+  sessionStorage.setItem('oauth_state', state);
+  
+  window.location.href = 'https://unionlogin.coze.site/api/auth/authorize?' + 
+    new URLSearchParams({
+      client_id: 'your_client_id',
+      redirect_uri: 'https://your-app.com/callback',
+      response_type: 'code',
+      scope: 'openid profile email',
+      state: state
+    });
+}
+```
+
+**2. 回调处理 - 用授权码换取用户信息**
+
+```javascript
+async function handleCallback(code) {
+  // 换取 Token
+  const tokenRes = await fetch('https://unionlogin.coze.site/api/auth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'authorization_code',
+      client_id: 'your_client_id',
+      client_secret: 'your_client_secret',
+      code: code,
+      redirect_uri: 'https://your-app.com/callback'
+    })
+  });
+  const { access_token } = await tokenRes.json();
+  
+  // 获取用户信息
+  const userRes = await fetch('https://unionlogin.coze.site/api/auth/userinfo', {
+    headers: { 'Authorization': `Bearer ${access_token}` }
+  });
+  const user = await userRes.json();
+  
+  // 创建本地会话（只存 user_id 和 token，不存用户详细信息）
+  session.user_id = user.sub;
+  session.access_token = access_token;
+}
+```
+
+---
+
+## 4. OAuth 2.0 对接
+
+### 4.1 对接流程
 
 ```
 1. 用户访问应用 → 应用重定向到 IdP 授权页面
@@ -133,7 +447,7 @@ https://unionlogin.coze.site/api/docs
 6. 应用创建本地会话
 ```
 
-### 3.2 注册应用
+### 4.2 注册应用
 
 在管理后台创建应用，获取 `client_id` 和 `client_secret`：
 
@@ -171,7 +485,7 @@ Authorization: Bearer {admin_token}
 
 > **注意**：`clientSecret` 在创建时返回，请妥善保管。如需查看可通过管理后台或 API 获取。
 
-### 3.3 授权码模式对接
+### 4.3 授权码模式对接
 
 #### Step 1: 构建授权 URL
 
@@ -258,7 +572,7 @@ Authorization: Bearer at_xxxxx
 }
 ```
 
-### 3.4 Token 刷新
+### 4.4 Token 刷新
 
 当 Access Token 过期时，使用 Refresh Token 获取新的 Access Token：
 
@@ -272,7 +586,7 @@ Content-Type: application/json
 }
 ```
 
-### 3.5 Token 验证
+### 4.5 Token 验证
 
 业务应用可以验证 Token 的有效性：
 
@@ -297,7 +611,7 @@ Content-Type: application/json
 }
 ```
 
-### 3.6 Token 撤销
+### 4.6 Token 撤销
 
 ```bash
 POST https://unionlogin.coze.site/api/auth/revoke
@@ -310,9 +624,9 @@ Content-Type: application/json
 
 ---
 
-## 4. API 接口参考
+## 5. API 接口参考
 
-### 4.1 用户管理
+### 5.1 用户管理
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -325,7 +639,68 @@ Content-Type: application/json
 | `/api/users/stats` | GET | 获取统计数据 | Bearer Token |
 | `/api/users/:id/department` | PUT | 分配用户部门 | Bearer Token |
 
-### 4.2 OAuth 2.0
+#### 用户注册
+
+```bash
+POST /api/users/register
+Content-Type: application/json
+
+{
+  "username": "zhangsan",
+  "email": "zhangsan@example.com",
+  "password": "your_password",
+  "nickname": "张三"  // 可选
+}
+```
+
+响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user-uuid-xxx",
+    "username": "zhangsan",
+    "email": "zhangsan@example.com",
+    "nickname": "张三",
+    "status": "active",
+    "created_at": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+#### 用户登录
+
+```bash
+POST /api/users/login
+Content-Type: application/json
+
+{
+  "login": "zhangsan",  // 用户名或邮箱
+  "password": "your_password"
+}
+```
+
+响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "at_xxxxx",
+    "refreshToken": "rt_xxxxx",
+    "user": {
+      "id": "user-uuid-xxx",
+      "username": "zhangsan",
+      "email": "zhangsan@example.com",
+      "nickname": "张三",
+      "tenant_id": "tenant-uuid"
+    }
+  }
+}
+```
+
+### 5.2 OAuth 2.0
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -336,7 +711,7 @@ Content-Type: application/json
 | `/api/auth/revoke` | POST | 撤销 Token | 否 |
 | `/api/auth/logout` | POST | 单点登出 | Bearer Token |
 
-### 4.3 应用管理
+### 5.3 应用管理
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -348,7 +723,7 @@ Content-Type: application/json
 | `/api/apps/:clientId/secret` | GET | 获取应用密钥 | Bearer Token |
 | `/api/apps/:clientId/regenerate-secret` | POST | 重新生成密钥 | Bearer Token |
 
-### 4.4 租户管理
+### 5.4 租户管理
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -356,7 +731,7 @@ Content-Type: application/json
 | `/api/tenants` | POST | 创建租户 | 否 |
 | `/api/tenants/:id` | GET | 租户详情 | 否 |
 
-### 4.5 组织架构
+### 5.5 组织架构
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -371,13 +746,13 @@ Content-Type: application/json
 | `/api/roles/assign` | POST | 分配角色 | Bearer Token |
 | `/api/roles/user/:userId` | GET | 获取用户角色 | Bearer Token |
 
-### 4.6 审计日志
+### 5.6 审计日志
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
 | `/api/audit/logs` | GET | 查询审计日志 | Bearer Token |
 
-### 4.7 第三方登录
+### 5.7 第三方登录
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -388,9 +763,9 @@ Content-Type: application/json
 
 ---
 
-## 5. SDK 对接示例
+## 6. SDK 对接示例
 
-### 5.1 前端 JavaScript 对接
+### 6.1 前端 JavaScript 对接
 
 ```javascript
 // identity-sdk.js
@@ -546,7 +921,7 @@ if (identity.isAuthenticated()) {
 await identity.logout();
 ```
 
-### 5.2 Node.js 后端对接
+### 6.2 Node.js 后端对接
 
 ```javascript
 // server.js
@@ -659,7 +1034,7 @@ app.listen(3000, () => {
 });
 ```
 
-### 5.3 Python (FastAPI) 对接
+### 6.3 Python (FastAPI) 对接
 
 ```python
 # main.py
@@ -769,9 +1144,9 @@ if __name__ == "__main__":
 
 ---
 
-## 6. 第三方登录集成
+## 7. 第三方登录集成
 
-### 6.1 GitHub 登录
+### 7.1 GitHub 登录
 
 **Step 1: 创建 GitHub OAuth App**
 
@@ -795,7 +1170,7 @@ GITHUB_CLIENT_SECRET=your_github_client_secret
 <a href="https://unionlogin.coze.site/api/auth/github">使用 GitHub 登录</a>
 ```
 
-### 6.2 Google 登录
+### 7.2 Google 登录
 
 **Step 1: 创建 Google OAuth App**
 
@@ -818,7 +1193,7 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 
 ---
 
-## 7. 常见问题
+## 8. 常见问题
 
 ### Q1: 授权码过期了怎么办？
 

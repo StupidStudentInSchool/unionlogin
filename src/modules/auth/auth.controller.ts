@@ -58,7 +58,7 @@ export class AuthController {
 
     return {
       requireLogin: true,
-      authorizeUrl: `/api/auth/login?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope || '')}&state=${encodeURIComponent(state || '')}`,
+      loginUrl: `/login.html?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope || '')}&state=${encodeURIComponent(state || '')}`,
     };
   }
 

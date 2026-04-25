@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户注册 - 统一身份认证中心</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .card-shadow {
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    }
+    .input-focus:focus {
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+    }
+    .password-strength {
+      height: 4px;
+      border-radius: 2px;
+      transition: all 0.3s ease;
+    }
+  </style>
+</head>
+<body class="min-h-screen gradient-bg flex items-center justify-center p-4">
+  <div class="w-full max-w-md">
+    <!-- Logo 和标题 -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
+        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-white">统一身份认证中心</h1>
+      <p class="text-purple-200 mt-2">创建您的账号</p>
+    </div>
+
+    <!-- 注册卡片 -->
+    <div class="bg-white rounded-2xl card-shadow p-8">
+      <h2 class="text-xl font-semibold text-gray-800 text-center mb-6">注册新账号</h2>
+      
+      <form id="registerForm" class="space-y-5">
+        <!-- 用户名 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">用户名 <span class="text-red-500">*</span></label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username"
+            required
+            minlength="3"
+            maxlength="32"
+            pattern="^[a-zA-Z][a-zA-Z0-9_-]*$"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus focus:outline-none focus:border-purple-500 transition-colors"
+            placeholder="字母开头，可包含字母、数字、下划线"
+          >
+          <p class="text-xs text-gray-500 mt-1">3-32个字符，字母开头</p>
+        </div>
+
+        <!-- 邮箱 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">邮箱 <span class="text-red-500">*</span></label>
+          <input 
+            type="email" 
+            id="email" 
+            name="email"
+            required
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus focus:outline-none focus:border-purple-500 transition-colors"
+            placeholder="your@email.com"
+          >
+        </div>
+
+        <!-- 密码 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">密码 <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <input 
+              type="password" 
+              id="password" 
+              name="password"
+              required
+              minlength="6"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus focus:outline-none focus:border-purple-500 transition-colors pr-12"
+              placeholder="至少6个字符"
+            >
+            <button 
+              type="button" 
+              id="togglePassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            >
+              <svg id="eyeIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
+          </div>
+          <!-- 密码强度指示器 -->
+          <div class="mt-2">
+            <div class="flex gap-1">
+              <div id="strength1" class="flex-1 password-strength bg-gray-200"></div>
+              <div id="strength2" class="flex-1 password-strength bg-gray-200"></div>
+              <div id="strength3" class="flex-1 password-strength bg-gray-200"></div>
+              <div id="strength4" class="flex-1 password-strength bg-gray-200"></div>
+            </div>
+            <p id="strengthText" class="text-xs text-gray-500 mt-1">请输入密码</p>
+          </div>
+        </div>
+
+        <!-- 确认密码 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">确认密码 <span class="text-red-500">*</span></label>
+          <input 
+            type="password" 
+            id="confirmPassword" 
+            name="confirmPassword"
+            required
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus focus:outline-none focus:border-purple-500 transition-colors"
+            placeholder="再次输入密码"
+          >
+          <p id="passwordMatch" class="text-xs mt-1 hidden"></p>
+        </div>
+
+        <!-- 昵称（可选） -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">昵称 <span class="text-gray-400">(可选)</span></label>
+          <input 
+            type="text" 
+            id="nickname" 
+            name="nickname"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg input-focus focus:outline-none focus:border-purple-500 transition-colors"
+            placeholder="您的显示名称"
+          >
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="errorMessage" class="hidden bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+        </div>
+
+        <!-- 注册按钮 -->
+        <button 
+          type="submit" 
+          id="submitBtn"
+          class="w-full py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          注册
+        </button>
+      </form>
+
+      <!-- 分隔线 -->
+      <div class="flex items-center my-6">
+        <div class="flex-1 border-t border-gray-200"></div>
+        <span class="px-4 text-sm text-gray-500">或</span>
+        <div class="flex-1 border-t border-gray-200"></div>
+      </div>
+
+      <!-- 第三方登录 -->
+      <div class="space-y-3">
+        <a href="/api/auth/github" class="flex items-center justify-center w-full py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          使用 GitHub 注册
+        </a>
+        <a href="/api/auth/google" class="flex items-center justify-center w-full py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          使用 Google 注册
+        </a>
+      </div>
+
+      <!-- 登录链接 -->
+      <p class="text-center text-sm text-gray-600 mt-6">
+        已有账号？
+        <a href="/login.html" class="text-purple-600 hover:text-purple-500 font-medium">立即登录</a>
+      </p>
+    </div>
+
+    <!-- 页脚 -->
+    <p class="text-center text-purple-200 text-sm mt-6">
+      &copy; 2024 统一身份认证中心
+    </p>
+  </div>
+
+  <script>
+    // 获取URL参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUri = urlParams.get('redirect_uri');
+    const clientId = urlParams.get('client_id');
+    const state = urlParams.get('state');
+
+    // 密码显示/隐藏
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const eyeIcon = document.getElementById('eyeIcon');
+
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.type === 'password' ? 'text' : 'password';
+      passwordInput.type = type;
+      confirmPassword.type = type;
+      eyeIcon.innerHTML = type === 'password' 
+        ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />'
+        : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />';
+    });
+
+    // 密码强度检测
+    function checkPasswordStrength(password) {
+      let strength = 0;
+      if (password.length >= 6) strength++;
+      if (password.length >= 10) strength++;
+      if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
+      if (/[0-9]/.test(password)) strength++;
+      if (/[^A-Za-z0-9]/.test(password)) strength++;
+      return Math.min(4, strength);
+    }
+
+    function updateStrengthIndicator(strength) {
+      const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'];
+      const texts = ['弱', '一般', '中等', '强'];
+      const strengthText = document.getElementById('strengthText');
+
+      for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById('strength' + i);
+        el.className = 'flex-1 password-strength ' + (i <= strength ? colors[strength - 1] : 'bg-gray-200');
+      }
+
+      if (strength > 0) {
+        strengthText.textContent = '密码强度: ' + texts[strength - 1];
+        strengthText.className = 'text-xs mt-1 ' + (strength >= 3 ? 'text-green-600' : strength >= 2 ? 'text-yellow-600' : 'text-red-600');
+      } else {
+        strengthText.textContent = '请输入密码';
+        strengthText.className = 'text-xs text-gray-500 mt-1';
+      }
+    }
+
+    passwordInput.addEventListener('input', (e) => {
+      const strength = checkPasswordStrength(e.target.value);
+      updateStrengthIndicator(strength);
+      checkPasswordMatch();
+    });
+
+    // 密码匹配检测
+    const confirmPassword = document.getElementById('confirmPassword');
+    const passwordMatch = document.getElementById('passwordMatch');
+
+    function checkPasswordMatch() {
+      const password = passwordInput.value;
+      const confirm = confirmPassword.value;
+      
+      if (confirm.length > 0) {
+        if (password === confirm) {
+          passwordMatch.textContent = '密码匹配 ✓';
+          passwordMatch.className = 'text-xs mt-1 text-green-600';
+        } else {
+          passwordMatch.textContent = '密码不匹配';
+          passwordMatch.className = 'text-xs mt-1 text-red-600';
+        }
+        passwordMatch.classList.remove('hidden');
+      } else {
+        passwordMatch.classList.add('hidden');
+      }
+    }
+
+    confirmPassword.addEventListener('input', checkPasswordMatch);
+
+    // 表单提交
+    const form = document.getElementById('registerForm');
+    const errorMessage = document.getElementById('errorMessage');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const password = document.getElementById('password').value;
+      const confirmPwd = document.getElementById('confirmPassword').value;
+
+      // 验证密码匹配
+      if (password !== confirmPwd) {
+        errorMessage.textContent = '两次输入的密码不一致';
+        errorMessage.classList.remove('hidden');
+        return;
+      }
+
+      // 验证密码强度
+      if (checkPasswordStrength(password) < 2) {
+        errorMessage.textContent = '密码强度不足，请使用更复杂的密码';
+        errorMessage.classList.remove('hidden');
+        return;
+      }
+
+      // 禁用按钮
+      submitBtn.disabled = true;
+      submitBtn.textContent = '注册中...';
+      errorMessage.classList.add('hidden');
+
+      const data = {
+        username: document.getElementById('username').value,
+        email: document.getElementById('email').value,
+        password: password,
+        nickname: document.getElementById('nickname').value || undefined,
+      };
+
+      try {
+        const response = await fetch('/api/users/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          // 注册成功，自动登录
+          const loginResponse = await fetch('/api/users/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              login: data.username,
+              password: password,
+            }),
+          });
+
+          const loginResult = await loginResponse.json();
+
+          if (loginResponse.ok && loginResult.success) {
+            // 保存token
+            localStorage.setItem('access_token', loginResult.data.access_token);
+            localStorage.setItem('refresh_token', loginResult.data.refresh_token);
+            localStorage.setItem('user', JSON.stringify(loginResult.data.user));
+
+            // 跳转
+            if (redirectUri && clientId) {
+              // 如果有OAuth参数，跳转到授权页面
+              window.location.href = `/api/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state || ''}`;
+            } else {
+              // 否则跳转到登录页面或首页
+              window.location.href = '/login.html?registered=1';
+            }
+          } else {
+            // 注册成功但登录失败，跳转到登录页
+            window.location.href = '/login.html?registered=1';
+          }
+        } else {
+          errorMessage.textContent = result.message || result.error || '注册失败，请重试';
+          errorMessage.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.textContent = '注册';
+        }
+      } catch (error) {
+        console.error('注册错误:', error);
+        errorMessage.textContent = '网络错误，请稍后重试';
+        errorMessage.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '注册';
+      }
+    });
+
+    // 检查是否已登录
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      // 已登录，直接跳转
+      if (redirectUri && clientId) {
+        window.location.href = `/api/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state || ''}`;
+      } else {
+        window.location.href = '/dashboard.html';
+      }
+    }
+  </script>
+</body>
+</html>

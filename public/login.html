@@ -107,7 +107,7 @@
 
         <p class="mt-6 text-center text-sm text-gray-500">
           还没有账户?
-          <a href="/setup.html" class="text-indigo-600 hover:text-indigo-700 font-medium ml-1">前往设置</a>
+          <a id="registerLink" href="/register.html" class="text-indigo-600 hover:text-indigo-700 font-medium ml-1">立即注册</a>
         </p>
       </div>
     </div>
@@ -116,6 +116,31 @@
   <script>
     const API = window.location.origin;
     const STORAGE_KEYS = { token: 'idc_access_token', refresh: 'idc_refresh_token', tenant: 'idc_tenant_id', user: 'idc_user' };
+
+    // 获取URL参数（用于OAuth流程）
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUri = urlParams.get('redirect_uri');
+    const clientId = urlParams.get('client_id');
+    const state = urlParams.get('state');
+    const registered = urlParams.get('registered');
+
+    // 如果是注册成功后跳转来的，显示提示
+    if (registered === '1') {
+      document.getElementById('error').textContent = '注册成功，请登录';
+      document.getElementById('error').classList.remove('hidden');
+      document.getElementById('error').className = 'mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-600 text-sm';
+    }
+
+    // 更新注册链接，传递OAuth参数
+    if (clientId && redirectUri) {
+      const registerLink = document.getElementById('registerLink');
+      const registerParams = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri
+      });
+      if (state) registerParams.set('state', state);
+      registerLink.href = `/register.html?${registerParams.toString()}`;
+    }
 
     async function loadTenants() {
       const res = await fetch(`${API}/api/tenants`);
@@ -165,7 +190,19 @@
           localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user || {}));
           console.log('[LOGIN] 保存成功, token:', loginData.accessToken?.substring(0, 20) + '...');
           console.log('[LOGIN] tenant:', actualTenantId);
-          window.location.href = '/dashboard.html';
+
+          // 如果有OAuth参数，跳转到授权页面
+          if (clientId && redirectUri) {
+            const authParams = new URLSearchParams({
+              client_id: clientId,
+              redirect_uri: redirectUri,
+              response_type: 'code'
+            });
+            if (state) authParams.set('state', state);
+            window.location.href = `/api/auth/authorize?${authParams.toString()}`;
+          } else {
+            window.location.href = '/dashboard.html';
+          }
         } else {
           showError(data.message || '登录失败');
         }
@@ -185,7 +222,17 @@
     }
 
     function oauth(provider) {
-      window.location.href = `${API}/api/oauth/authorize/${provider}`;
+      // 如果有OAuth参数，第三方登录成功后应该跳转回应用
+      let callbackUrl = `${API}/api/auth/${provider}`;
+      if (clientId && redirectUri) {
+        const params = new URLSearchParams({
+          client_id: clientId,
+          redirect_uri: redirectUri
+        });
+        if (state) params.set('state', state);
+        callbackUrl += `?${params.toString()}`;
+      }
+      window.location.href = callbackUrl;
     }
 
     loadTenants();
