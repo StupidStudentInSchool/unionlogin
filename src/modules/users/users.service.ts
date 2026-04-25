@@ -552,24 +552,19 @@ export class UsersService {
   }
 
   // 获取用户授权的应用列表
+  // 应用是全局共享的，所有用户看到的应用列表相同
+  // 通过授权控制用户能否访问
   async getUserApps(userId: string): Promise<any[]> {
     const client = getSupabaseClient();
-
-    // 获取用户信息（包含租户ID）
-    const user = await userService.findById(userId);
-    if (!user) {
-      throw new Error('用户不存在');
-    }
 
     // 检查是否为管理员
     const isAdmin = await this.isAdmin(userId);
 
-    // 获取该租户的应用列表
+    // 获取所有活跃应用（全局共享，不按租户过滤）
     const { data: allApps, error } = await client
       .from('oauth_clients')
       .select('id, name, client_id, status, created_at')
       .eq('status', 'active')
-      .eq('tenant_id', user.tenant_id)
       .order('created_at', { ascending: false });
 
     if (error) {
