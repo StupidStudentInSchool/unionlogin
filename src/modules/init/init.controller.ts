@@ -1,7 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { transactionService } from '../../storage/database/transaction.service';
-import { auditService } from '../../storage/database/services';
+import { auditService, roleService, getSupabaseClient } from '../../storage/database/services';
 import { Public } from '../../common/decorators/auth.decorator';
 
 @ApiTags('初始化')
@@ -41,6 +41,16 @@ export class InitController {
         tenant: { name: body.tenantName, slug: body.tenantSlug },
         admin: { username: body.username, email: body.email, password: body.password },
       });
+
+      // 给管理员分配 admin 角色
+      try {
+        const adminRole = await this.findAdminRole(result.tenant.id);
+        if (adminRole) {
+          await roleService.assignRoleToUser(result.user.id, adminRole.id);
+        }
+      } catch (roleError) {
+        console.warn('分配管理员角色失败（不影响主流程）:', roleError);
+      }
 
       // 记录审计日志（可选，失败不影响主流程）
       try {
@@ -82,5 +92,19 @@ export class InitController {
       console.error('初始化失败:', error);
       throw new Error(error.message || '初始化失败，请稍后重试');
     }
+  }
+
+  // 查找 admin 角色
+  private async findAdminRole(tenantId: string): Promise<any> {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('roles')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('code', 'admin')
+      .single();
+
+    if (error || !data) return null;
+    return data;
   }
 }

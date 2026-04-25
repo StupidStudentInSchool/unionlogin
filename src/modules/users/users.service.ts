@@ -1,7 +1,17 @@
-import { userService, auditService, thirdPartyService } from '../../storage/database/services';
+import { userService, auditService, thirdPartyService, roleService, departmentService } from '../../storage/database/services';
 import { getSupabaseClient } from '../../storage/database/supabase-client';
 import type { User, InsertUser } from '../../storage/database/shared/schema';
 import * as crypto from 'crypto';
+
+export interface UserWithDetails extends User {
+  department?: {
+    id: string;
+    name: string;
+    path?: string;
+  } | null;
+  roles: string[];
+  permissions: string[];
+}
 
 export class UsersService {
   // 用户注册
@@ -59,11 +69,14 @@ export class UsersService {
     }
 
     if (!user) {
+      console.log('[Login] 用户不存在:', data.login);
       throw new Error('用户名或密码错误');
     }
 
+    console.log('[Login] 用户找到:', user.username, 'hasHash:', !!user.password_hash);
     // 验证密码
     const isValid = await userService.verifyPassword(user, data.password);
+    console.log('[Login] 密码验证结果:', isValid);
     if (!isValid) {
       throw new Error('用户名或密码错误');
     }
@@ -90,6 +103,29 @@ export class UsersService {
       expires_at: expiresAt.toISOString(),
     });
 
+    // 获取用户角色和部门信息
+    const roles = await roleService.getUserRoleCodes(user.id);
+    let department: UserWithDetails['department'] = null;
+    if ((user as any).department_id) {
+      const dept = await departmentService.findById((user as any).department_id);
+      if (dept) {
+        const path = await departmentService.getDepartmentPath(dept.id);
+        department = {
+          id: dept.id,
+          name: dept.name,
+          path,
+        };
+      }
+    }
+
+    // 构建完整的用户信息
+    const userWithDetails: UserWithDetails = {
+      ...user,
+      department,
+      roles,
+      permissions: [],
+    };
+
     // 记录审计日志
     await auditService.create({
       event_type: 'login',
@@ -98,16 +134,44 @@ export class UsersService {
       user_agent: userAgent,
     });
 
-    return { user, accessToken, refreshToken };
+    return { user: userWithDetails, accessToken, refreshToken };
   }
 
-  // 获取用户信息
-  async getProfile(userId: string): Promise<User> {
+  // 获取用户信息（包含部门、角色）
+  async getProfile(userId: string): Promise<UserWithDetails> {
     const user = await userService.findById(userId);
     if (!user) {
       throw new Error('用户不存在');
     }
-    return user;
+
+    // 获取用户角色
+    const roles = await roleService.getUserRoleCodes(userId);
+
+    // 获取用户部门
+    let department: UserWithDetails['department'] = null;
+    if ((user as any).department_id) {
+      const dept = await departmentService.findById((user as any).department_id);
+      if (dept) {
+        const path = await departmentService.getDepartmentPath(dept.id);
+        department = {
+          id: dept.id,
+          name: dept.name,
+          path,
+        };
+      }
+    }
+
+    return {
+      ...user,
+      department,
+      roles,
+      permissions: [], // 暂时为空，后续可扩展
+    };
+  }
+
+  // 获取用户完整信息（用于登录返回）
+  async getUserWithDetails(userId: string): Promise<UserWithDetails> {
+    return this.getProfile(userId);
   }
 
   // 更新用户信息

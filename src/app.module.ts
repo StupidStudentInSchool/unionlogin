@@ -14,6 +14,10 @@ import { AuditModule } from './modules/audit/audit.module';
 import { TenantController } from './modules/tenant/tenant.controller';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { InitController } from './modules/init/init.controller';
+import { DepartmentsController } from './modules/departments/departments.controller';
+import { DepartmentsModule } from './modules/departments/departments.module';
+import { RolesController } from './modules/roles/roles.controller';
+import { RolesModule } from './modules/roles/roles.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
@@ -25,6 +29,8 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     ThirdPartyModule,
     AuditModule,
     TenantModule,
+    DepartmentsModule,
+    RolesModule,
   ],
   controllers: [
     RootController,
@@ -36,6 +42,8 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     AuditController,
     TenantController,
     InitController,
+    DepartmentsController,
+    RolesController,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -33,11 +33,15 @@ export class UsersController {
   @Post('login')
   @ApiOperation({ summary: '用户登录' })
   async login(
-    @Body() body: { login: string; password: string },
+    @Body() body: { login?: string; email?: string; password: string },
     @Req() req: Request,
   ) {
     const ipAddress = (req.headers['x-forwarded-for'] as string) || '';
-    return usersService.login(body, ipAddress, req.headers['user-agent']);
+    const loginData = {
+      login: body.login || body.email || '',
+      password: body.password,
+    };
+    return usersService.login(loginData, ipAddress, req.headers['user-agent']);
   }
 
   @UseGuards(AuthGuard)

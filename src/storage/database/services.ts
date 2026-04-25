@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabase-client';
+export { getSupabaseClient };
 import * as bcrypt from 'bcryptjs';
 import type { User, Tenant, OAuthClient, AuditLog, ThirdPartyAccount, UserSession } from './shared/schema';
 
@@ -281,6 +282,87 @@ export class ThirdPartyService {
   }
 }
 
+// 角色服务（用于获取用户角色）
+export class RoleService {
+  private client = getSupabaseClient();
+
+  async getUserRoles(userId: string): Promise<{ id: string; name: string; code: string }[]> {
+    const { data, error } = await this.client
+      .from('user_roles')
+      .select(`
+        roles (
+          id,
+          name,
+          code
+        )
+      `)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.warn('获取用户角色失败:', error.message);
+      return [];
+    }
+
+    return (data || []).map((item: any) => item.roles).filter(Boolean);
+  }
+
+  async getUserRoleCodes(userId: string): Promise<string[]> {
+    const roles = await this.getUserRoles(userId);
+    return roles.map((r) => r.code);
+  }
+
+  async assignRoleToUser(userId: string, roleId: string): Promise<void> {
+    const { error } = await this.client
+      .from('user_roles')
+      .insert({
+        user_id: userId,
+        role_id: roleId,
+      });
+
+    if (error && error.code !== '23505') { // 忽略重复插入错误
+      throw new Error(`分配角色失败: ${error.message}`);
+    }
+  }
+}
+
+// 部门服务（用于获取用户部门信息）
+export class DepartmentService {
+  private client = getSupabaseClient();
+
+  async findById(id: string): Promise<any | null> {
+    const { data, error } = await this.client
+      .from('departments')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
+  async getDepartmentPath(id: string): Promise<string> {
+    const path: string[] = [];
+    let currentId: string | null = id;
+
+    while (currentId) {
+      const { data } = await this.client
+        .from('departments')
+        .select('id, name, parent_id')
+        .eq('id', currentId)
+        .single();
+
+      if (data) {
+        path.unshift(data.name);
+        currentId = data.parent_id;
+      } else {
+        break;
+      }
+    }
+
+    return path.join('/');
+  }
+}
+
 // 导出服务实例
 export const userService = new UserService();
 export const tenantService = new TenantService();
@@ -288,3 +370,5 @@ export const oauthClientService = new OAuthClientService();
 export const sessionService = new SessionService();
 export const auditService = new AuditService();
 export const thirdPartyService = new ThirdPartyService();
+export const roleService = new RoleService();
+export const departmentService = new DepartmentService();
