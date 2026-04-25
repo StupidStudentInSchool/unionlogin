@@ -155,6 +155,35 @@ export class RolesService {
   }
 
   /**
+   * 获取用户的角色代码列表
+   */
+  async getUserRoleCodes(userId: string): Promise<string[]> {
+    // 先从用户 metadata.roles 获取角色 ID
+    const { data: user } = await this.client
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .single();
+
+    if (!user || !user.metadata?.roles || !Array.isArray(user.metadata.roles)) {
+      return [];
+    }
+
+    const roleIds = user.metadata.roles as string[];
+    if (roleIds.length === 0) {
+      return [];
+    }
+
+    // 查询角色代码
+    const { data: roles } = await this.client
+      .from('roles')
+      .select('code')
+      .in('id', roleIds);
+
+    return (roles || []).map((r) => r.code);
+  }
+
+  /**
    * 分配角色给用户
    */
   async assignRoles(userId: string, roleIds: string[]): Promise<void> {
