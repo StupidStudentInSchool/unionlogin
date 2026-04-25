@@ -95,19 +95,35 @@ export class UsersService {
 
     const client = getSupabaseClient();
     
+    // 处理 IP 地址：只取第一个，并截断到 45 字符
+    let safeIpAddress = ipAddress || '';
+    if (safeIpAddress.includes(',')) {
+      safeIpAddress = safeIpAddress.split(',')[0].trim();
+    }
+    safeIpAddress = safeIpAddress.substring(0, 45);
+    
+    // 处理 User Agent：截断到合适长度
+    const safeUserAgent = (userAgent || '').substring(0, 500);
+    
     // 插入 session 并检查是否成功
     const { data: sessionData, error: sessionError } = await client.from('user_sessions').insert({
       user_id: user.id,
       token_hash: accessToken,
       refresh_token_hash: refreshToken,
-      ip_address: ipAddress || '',
-      user_agent: userAgent || '',
+      ip_address: safeIpAddress,
+      user_agent: safeUserAgent,
       expires_at: expiresAt.toISOString(),
     }).select();
 
     if (sessionError) {
-      console.error('[Login] Session 创建失败:', sessionError);
-      throw new Error('登录失败：无法创建会话');
+      console.error('[Login] Session 创建失败:', JSON.stringify(sessionError, null, 2));
+      console.error('[Login] 尝试插入的数据:', {
+        user_id: user.id,
+        token_hash_length: accessToken.length,
+        ip_address_length: safeIpAddress.length,
+        user_agent_length: safeUserAgent.length,
+      });
+      throw new Error('登录失败：无法创建会话 - ' + sessionError.message);
     }
     
     console.log('[Login] Session 创建成功:', sessionData?.[0]?.id || 'unknown');
