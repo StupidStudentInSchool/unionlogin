@@ -149,9 +149,11 @@
         const loginData = data.data || {};
 
         if (loginData.accessToken) {
+          // 优先使用登录响应中的 tenant_id，而不是下拉框选择的
+          const actualTenantId = loginData.user?.tenant_id || tenantId;
           localStorage.setItem(STORAGE_KEYS.token, loginData.accessToken);
           localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken);
-          localStorage.setItem(STORAGE_KEYS.tenant, tenantId);
+          localStorage.setItem(STORAGE_KEYS.tenant, actualTenantId);
           localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user));
           window.location.href = '/dashboard.html';
         } else {
