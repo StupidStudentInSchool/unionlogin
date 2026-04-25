@@ -145,6 +145,7 @@
           headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
           body: JSON.stringify({ login: username, password }),
         });
+        const data = await res.json();
         const loginData = data.success ? (data.data || {}) : data;
 
         if (loginData.accessToken) {
