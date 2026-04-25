@@ -150,7 +150,7 @@
           <textarea id="role-description" class="textarea textarea-bordered"></textarea>
         </div>
         <div class="modal-action">
-          <button type="button" class="btn" onclick="role-modal.close()">取消</button>
+          <button type="button" class="btn" onclick="document.getElementById('role-modal').close()">取消</button>
           <button type="submit" class="btn btn-primary">保存</button>
         </div>
       </form>
@@ -172,7 +172,7 @@
         <div id="role-checkboxes" class="space-y-2"></div>
       </div>
       <div class="modal-action">
-        <button type="button" class="btn" onclick="user-role-modal.close()">取消</button>
+        <button type="button" class="btn" onclick="document.getElementById('user-role-modal').close()">取消</button>
         <button type="button" class="btn btn-primary" onclick="saveUserRoles()">保存</button>
       </div>
     </div>
