@@ -76,9 +76,6 @@
     <div id="panel-users" class="bg-white rounded-xl shadow-sm p-6 hidden fade-in">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-lg font-semibold text-gray-800">用户列表</h2>
-        <button onclick="showUserRoleModal()" class="btn btn-primary btn-sm">
-          <i class="fas fa-user-cog mr-1"></i>分配角色
-        </button>
       </div>
       <div id="user-list" class="overflow-x-auto">
         <table class="table w-full">
@@ -664,8 +661,14 @@
 
     // 分配角色
     function showUserRoleModal(userId) {
+      console.log('showUserRoleModal called with userId:', userId);
+      console.log('users array:', users);
       const user = users.find(u => u.id === userId);
-      if (!user) return;
+      console.log('found user:', user);
+      if (!user) {
+        showToast('未找到用户', 'error');
+        return;
+      }
 
       document.getElementById('role-user-id').value = userId;
       document.getElementById('role-user-name').textContent = `${user.username} (${user.email})`;
