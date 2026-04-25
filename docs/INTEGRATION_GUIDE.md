@@ -20,8 +20,9 @@
 - **统一用户管理**：注册、登录、个人信息管理
 - **单点登录（SSO）**：一次登录，全站通行
 - **OAuth 2.0 / OIDC 支持**：标准协议对接
-- **第三方登录**：GitHub、Google、微信
+- **第三方登录**：GitHub、Google
 - **多租户支持**：支持多个组织隔离
+- **组织架构管理**：部门、角色、权限
 
 ### 1.2 系统架构
 
@@ -55,6 +56,13 @@
 | **Refresh Token** | 刷新令牌，用于续期 Access Token |
 | **Scope** | 权限范围，如 `openid`, `profile`, `email` |
 
+### 1.4 环境地址
+
+| 环境 | 地址 |
+|------|------|
+| **生产环境** | https://unionlogin.coze.site |
+| **API 文档** | https://unionlogin.coze.site/api/docs |
+
 ---
 
 ## 2. 快速开始
@@ -62,50 +70,31 @@
 ### 2.1 环境要求
 
 - Node.js >= 18
-- MySQL >= 8.0
-- Redis >= 6.0
+- PostgreSQL >= 14 (使用 Coze Supabase)
+- Redis >= 6.0 (可选)
 
 ### 2.2 配置步骤
 
 **Step 1: 配置环境变量**
 
-```bash
-cp .env.example .env
-```
-
-编辑 `.env` 文件：
-
 ```env
-# 数据库配置
-DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=your_password
-DB_NAME=identity_center
-
-# Redis 配置
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# JWT 配置（生产环境请修改）
-JWT_SECRET=your-super-secret-key-change-in-production
+# Coze 平台自动注入 Supabase 配置
+COZE_SUPABASE_URL=your_supabase_url
+COZE_SUPABASE_ANON_KEY=your_anon_key
+COZE_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # 应用配置
 APP_PORT=5000
 FRONTEND_URL=http://localhost:3000
+
+# 第三方登录（可选）
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 ```
 
-**Step 2: 初始化数据库**
-
-```bash
-# 创建数据库
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS identity_center CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-# 初始化数据
-pnpm ts-node src/database/init.ts
-```
-
-**Step 3: 启动服务**
+**Step 2: 启动服务**
 
 ```bash
 # 开发模式
@@ -116,17 +105,18 @@ pnpm build
 pnpm start:prod
 ```
 
-**Step 4: 访问文档**
+**Step 3: 访问文档**
 
 ```
-http://localhost:5000/api/docs
+https://unionlogin.coze.site/api/docs
 ```
 
-### 2.3 默认账户
+### 2.3 初始化流程
 
-| 账户 | 用户名 | 密码 |
-|------|--------|------|
-| 管理员 | admin | admin123 |
+首次访问系统会自动跳转到初始化页面，需要：
+1. 创建管理员账号
+2. 创建默认租户
+3. 配置系统基础信息
 
 ---
 
@@ -145,52 +135,64 @@ http://localhost:5000/api/docs
 
 ### 3.2 注册应用
 
-在管理员后台或调用 API 创建应用：
+在管理后台创建应用，获取 `client_id` 和 `client_secret`：
+
+**创建应用请求：**
 
 ```bash
 POST /api/apps
+Content-Type: application/json
+Authorization: Bearer {admin_token}
+
 {
   "name": "My Application",
-  "description": "My awesome app",
-  "redirectUris": ["http://localhost:3000/callback"],
-  "allowedScopes": ["openid", "profile", "email"]
+  "redirectUris": ["https://your-app.com/callback"],
+  "scopes": ["openid", "profile", "email"]
 }
 ```
 
-返回：
+**响应：**
+
 ```json
 {
-  "id": "uuid-xxx",
-  "clientId": "app_xxxxxxxxxxxx",
-  "clientSecret": "xxxxxxxxxx",  // 仅创建时返回，请妥善保管
-  "name": "My Application",
-  "redirectUris": ["http://localhost:3000/callback"],
-  "allowedScopes": ["openid", "profile", "email"],
-  "status": 1
+  "app": {
+    "id": "uuid-xxx",
+    "client_id": "a1b2c3d4e5f6...",
+    "name": "My Application",
+    "redirect_uris": ["https://your-app.com/callback"],
+    "scopes": ["openid", "profile", "email"],
+    "status": "active",
+    "created_at": "2024-01-01T00:00:00Z",
+    "tenant_id": "tenant-uuid"
+  },
+  "clientSecret": "s3cr3t..."
 }
 ```
+
+> **注意**：`clientSecret` 在创建时返回，请妥善保管。如需查看可通过管理后台或 API 获取。
 
 ### 3.3 授权码模式对接
 
 #### Step 1: 构建授权 URL
 
 ```
-GET {IDP_BASE_URL}/api/auth/authorize
+GET https://unionlogin.coze.site/api/auth/authorize
 ```
 
 参数：
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
-| clientId | 是 | 应用的 Client ID |
-| redirectUri | 是 | 授权成功后的回调地址 |
-| responseType | 是 | 固定为 `code` |
+| client_id | 是 | 应用的 Client ID |
+| redirect_uri | 是 | 授权成功后的回调地址 |
+| response_type | 是 | 固定为 `code` |
 | scope | 否 | 权限范围，默认 `openid profile email` |
 | state | 推荐 | CSRF 防护随机字符串 |
 
 示例：
+
 ```
-http://localhost:5000/api/auth/authorize?clientId=app_xxxxxxxxxxxx&redirectUri=http://localhost:3000/callback&responseType=code&scope=openid%20profile%20email&state=random_string_xyz
+https://unionlogin.coze.site/api/auth/authorize?client_id=a1b2c3d4e5f6&redirect_uri=https://your-app.com/callback&response_type=code&scope=openid%20profile%20email&state=random_string_xyz
 ```
 
 #### Step 2: 处理回调
@@ -198,10 +200,11 @@ http://localhost:5000/api/auth/authorize?clientId=app_xxxxxxxxxxxx&redirectUri=h
 用户在 IdP 登录授权后，会重定向到你的回调地址：
 
 ```
-http://localhost:3000/callback?code=auth_code_xxx&state=random_string_xyz
+https://your-app.com/callback?code=auth_code_xxx&state=random_string_xyz
 ```
 
 **验证 state 参数**：
+
 ```javascript
 // 验证 state 防止 CSRF 攻击
 if (state !== savedState) {
@@ -212,25 +215,26 @@ if (state !== savedState) {
 #### Step 3: 换取 Access Token
 
 ```bash
-POST {IDP_BASE_URL}/api/auth/token
+POST https://unionlogin.coze.site/api/auth/token
 Content-Type: application/json
 
 {
-  "grantType": "authorization_code",
-  "clientId": "app_xxxxxxxxxxxx",
-  "clientSecret": "your_client_secret",
+  "grant_type": "authorization_code",
+  "client_id": "a1b2c3d4e5f6",
+  "client_secret": "your_client_secret",
   "code": "auth_code_xxx",
-  "redirectUri": "http://localhost:3000/callback"
+  "redirect_uri": "https://your-app.com/callback"
 }
 ```
 
 响应：
+
 ```json
 {
-  "accessToken": "at_xxxxx",
-  "tokenType": "Bearer",
-  "expiresIn": 3600,
-  "refreshToken": "rt_xxxxx",
+  "access_token": "at_xxxxx",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "rt_xxxxx",
   "scope": "openid profile email"
 }
 ```
@@ -238,20 +242,19 @@ Content-Type: application/json
 #### Step 4: 获取用户信息
 
 ```bash
-GET {IDP_BASE_URL}/api/auth/userinfo
+GET https://unionlogin.coze.site/api/auth/userinfo
 Authorization: Bearer at_xxxxx
 ```
 
 响应：
+
 ```json
 {
   "sub": "user-uuid-xxx",
   "username": "zhangsan",
   "email": "zhangsan@example.com",
-  "emailVerified": true,
   "nickname": "张三",
-  "picture": "https://example.com/avatar.jpg",
-  "updatedAt": 1704067200
+  "avatar": "https://example.com/avatar.jpg"
 }
 ```
 
@@ -260,14 +263,12 @@ Authorization: Bearer at_xxxxx
 当 Access Token 过期时，使用 Refresh Token 获取新的 Access Token：
 
 ```bash
-POST {IDP_BASE_URL}/api/auth/token
+POST https://unionlogin.coze.site/api/auth/token
 Content-Type: application/json
 
 {
-  "grantType": "refresh_token",
-  "clientId": "app_xxxxxxxxxxxx",
-  "clientSecret": "your_client_secret",
-  "refreshToken": "rt_xxxxx"
+  "grant_type": "refresh_token",
+  "refresh_token": "rt_xxxxx"
 }
 ```
 
@@ -276,7 +277,7 @@ Content-Type: application/json
 业务应用可以验证 Token 的有效性：
 
 ```bash
-POST {IDP_BASE_URL}/api/auth/introspect
+POST https://unionlogin.coze.site/api/auth/introspect
 Content-Type: application/json
 
 {
@@ -285,6 +286,7 @@ Content-Type: application/json
 ```
 
 响应：
+
 ```json
 {
   "active": true,
@@ -292,6 +294,17 @@ Content-Type: application/json
   "username": "zhangsan",
   "exp": 1704070800,
   "iat": 1704067200
+}
+```
+
+### 3.6 Token 撤销
+
+```bash
+POST https://unionlogin.coze.site/api/auth/revoke
+Content-Type: application/json
+
+{
+  "token": "at_xxxxx"
 }
 ```
 
@@ -305,21 +318,23 @@ Content-Type: application/json
 |------|------|------|------|
 | `/api/users/register` | POST | 用户注册 | 否 |
 | `/api/users/login` | POST | 用户登录 | 否 |
-| `/api/users/me` | GET | 获取当前用户 | Bearer Token |
-| `/api/users/me` | PUT | 更新个人信息 | Bearer Token |
+| `/api/users/profile` | GET | 获取当前用户 | Bearer Token |
+| `/api/users/profile` | PUT | 更新个人信息 | Bearer Token |
 | `/api/users/password` | PUT | 修改密码 | Bearer Token |
-| `/api/users/sessions` | GET | 获取登录设备 | Bearer Token |
+| `/api/users` | GET | 获取用户列表 | Bearer Token |
+| `/api/users/stats` | GET | 获取统计数据 | Bearer Token |
+| `/api/users/:id/department` | PUT | 分配用户部门 | Bearer Token |
 
 ### 4.2 OAuth 2.0
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
-| `/api/auth/authorize` | GET/POST | 授权页面 | 可选 |
-| `/api/auth/token` | POST | 获取 Token | Client Secret |
+| `/api/auth/authorize` | GET | 授权入口 | 可选 |
+| `/api/auth/token` | POST | 获取/刷新 Token | 否 |
 | `/api/auth/userinfo` | GET | 获取用户信息 | Bearer Token |
 | `/api/auth/introspect` | POST | 验证 Token | 否 |
 | `/api/auth/revoke` | POST | 撤销 Token | 否 |
-| `/api/auth/logout` | GET | 单点登出 | Bearer Token |
+| `/api/auth/logout` | POST | 单点登出 | Bearer Token |
 
 ### 4.3 应用管理
 
@@ -327,17 +342,42 @@ Content-Type: application/json
 |------|------|------|------|
 | `/api/apps` | GET | 应用列表 | Bearer Token |
 | `/api/apps` | POST | 创建应用 | Bearer Token |
-| `/api/apps/:id` | GET | 应用详情 | Bearer Token |
-| `/api/apps/:id` | PUT | 更新应用 | Bearer Token |
-| `/api/apps/:id` | DELETE | 删除应用 | Bearer Token |
+| `/api/apps/:clientId` | GET | 应用详情 | 否 |
+| `/api/apps/:clientId` | PUT | 更新应用 | Bearer Token |
+| `/api/apps/:clientId` | DELETE | 删除应用 | Bearer Token |
+| `/api/apps/:clientId/secret` | GET | 获取应用密钥 | Bearer Token |
+| `/api/apps/:clientId/regenerate-secret` | POST | 重新生成密钥 | Bearer Token |
 
-### 4.4 审计日志
+### 4.4 租户管理
+
+| 接口 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `/api/tenants` | GET | 租户列表 | 否 |
+| `/api/tenants` | POST | 创建租户 | 否 |
+| `/api/tenants/:id` | GET | 租户详情 | 否 |
+
+### 4.5 组织架构
+
+| 接口 | 方法 | 说明 | 认证 |
+|------|------|------|------|
+| `/api/departments` | GET | 部门列表 | Bearer Token |
+| `/api/departments` | POST | 创建部门 | Bearer Token |
+| `/api/departments/:id` | PUT | 更新部门 | Bearer Token |
+| `/api/departments/:id` | DELETE | 删除部门 | Bearer Token |
+| `/api/roles` | GET | 角色列表 | Bearer Token |
+| `/api/roles` | POST | 创建角色 | Bearer Token |
+| `/api/roles/:id` | PUT | 更新角色 | Bearer Token |
+| `/api/roles/:id` | DELETE | 删除角色 | Bearer Token |
+| `/api/roles/assign` | POST | 分配角色 | Bearer Token |
+| `/api/roles/user/:userId` | GET | 获取用户角色 | Bearer Token |
+
+### 4.6 审计日志
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
 | `/api/audit/logs` | GET | 查询审计日志 | Bearer Token |
 
-### 4.5 第三方登录
+### 4.7 第三方登录
 
 | 接口 | 方法 | 说明 | 认证 |
 |------|------|------|------|
@@ -345,8 +385,6 @@ Content-Type: application/json
 | `/api/auth/github/callback` | GET | GitHub 回调 | 否 |
 | `/api/auth/google` | GET | Google 登录入口 | 否 |
 | `/api/auth/google/callback` | GET | Google 回调 | 否 |
-| `/api/auth/wechat` | GET | 微信登录入口 | 否 |
-| `/api/auth/wechat/callback` | GET | 微信回调 | 否 |
 
 ---
 
@@ -358,8 +396,9 @@ Content-Type: application/json
 // identity-sdk.js
 class IdentityCenter {
   constructor(options) {
-    this.baseUrl = options.baseUrl;
+    this.baseUrl = options.baseUrl || 'https://unionlogin.coze.site';
     this.clientId = options.clientId;
+    this.clientSecret = options.clientSecret;
     this.redirectUri = options.redirectUri;
     this.scope = options.scope || 'openid profile email';
   }
@@ -375,9 +414,9 @@ class IdentityCenter {
     sessionStorage.setItem('oauth_state', state);
     
     const params = new URLSearchParams({
-      clientId: this.clientId,
-      redirectUri: this.redirectUri,
-      responseType: 'code',
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      response_type: 'code',
       scope: this.scope,
       state,
     });
@@ -406,19 +445,19 @@ class IdentityCenter {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        grantType: 'authorization_code',
-        clientId: this.clientId,
-        clientSecret: this.clientSecret,
+        grant_type: 'authorization_code',
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
         code,
-        redirectUri: this.redirectUri,
+        redirect_uri: this.redirectUri,
       }),
     });
     
     const data = await response.json();
     
     // 保存 Token
-    localStorage.setItem('access_token', data.accessToken);
-    localStorage.setItem('refresh_token', data.refreshToken);
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
     
     return data;
   }
@@ -445,16 +484,14 @@ class IdentityCenter {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        grantType: 'refresh_token',
-        clientId: this.clientId,
-        clientSecret: this.clientSecret,
-        refreshToken,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
       }),
     });
     
     const data = await response.json();
-    localStorage.setItem('access_token', data.accessToken);
-    localStorage.setItem('refresh_token', data.refreshToken);
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
     
     return data;
   }
@@ -465,12 +502,15 @@ class IdentityCenter {
   }
 
   // 登出
-  logout() {
+  async logout() {
     const token = localStorage.getItem('access_token');
     if (token) {
-      fetch(`${this.baseUrl}/api/auth/logout`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
+      await fetch(`${this.baseUrl}/api/auth/logout`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
       });
     }
     localStorage.removeItem('access_token');
@@ -480,17 +520,18 @@ class IdentityCenter {
 
 // 使用示例
 const identity = new IdentityCenter({
-  baseUrl: 'http://localhost:5000',
+  baseUrl: 'https://unionlogin.coze.site',
   clientId: 'your_client_id',
-  redirectUri: 'http://localhost:3000/callback',
+  clientSecret: 'your_client_secret',
+  redirectUri: 'https://your-app.com/callback',
 });
 
 // 登录
 identity.login();
 
 // 回调处理（在 callback 页面调用）
-const user = await identity.handleCallback();
-console.log(user);
+const tokens = await identity.handleCallback();
+console.log(tokens);
 
 // 获取用户信息
 const userInfo = await identity.getUserInfo();
@@ -502,7 +543,7 @@ if (identity.isAuthenticated()) {
 }
 
 // 登出
-identity.logout();
+await identity.logout();
 ```
 
 ### 5.2 Node.js 后端对接
@@ -516,10 +557,10 @@ const session = require('express-session');
 
 const app = express();
 
-const IDP_BASE_URL = 'http://localhost:5000';
+const IDP_BASE_URL = 'https://unionlogin.coze.site';
 const CLIENT_ID = 'your_client_id';
 const CLIENT_SECRET = 'your_client_secret';
-const REDIRECT_URI = 'http://localhost:3000/auth/callback';
+const REDIRECT_URI = 'https://your-app.com/auth/callback';
 
 app.use(session({
   secret: 'your-session-secret',
@@ -533,9 +574,9 @@ app.get('/auth/login', (req, res) => {
   req.session.oauthState = state;
   
   const params = new URLSearchParams({
-    clientId: CLIENT_ID,
-    redirectUri: REDIRECT_URI,
-    responseType: 'code',
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    response_type: 'code',
     scope: 'openid profile email',
     state,
   });
@@ -558,29 +599,29 @@ app.get('/auth/callback', async (req, res) => {
   try {
     // 换取 Token
     const tokenResponse = await axios.post(`${IDP_BASE_URL}/api/auth/token`, {
-      grantType: 'authorization_code',
-      clientId: CLIENT_ID,
-      clientSecret: CLIENT_SECRET,
+      grant_type: 'authorization_code',
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
       code,
-      redirectUri: REDIRECT_URI,
+      redirect_uri: REDIRECT_URI,
     });
     
-    const { accessToken, refreshToken } = tokenResponse.data.data;
+    const { access_token, refresh_token } = tokenResponse.data;
     
     // 获取用户信息
     const userResponse = await axios.get(`${IDP_BASE_URL}/api/auth/userinfo`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${access_token}` },
     });
     
-    const user = userResponse.data.data;
+    const user = userResponse.data;
     
     // 创建本地会话
     req.session.user = {
       id: user.sub,
       username: user.username,
       email: user.email,
-      accessToken,
-      refreshToken,
+      accessToken: access_token,
+      refreshToken: refresh_token,
     };
     
     res.redirect('/dashboard');
@@ -599,14 +640,18 @@ app.get('/dashboard', (req, res) => {
 });
 
 // 登出
-app.get('/auth/logout', (req, res) => {
+app.post('/auth/logout', async (req, res) => {
   if (req.session.user?.accessToken) {
-    axios.post(`${IDP_BASE_URL}/api/auth/revoke`, {
-      token: req.session.user.accessToken,
-    }).catch(console.error);
+    try {
+      await axios.post(`${IDP_BASE_URL}/api/auth/revoke`, {
+        token: req.session.user.accessToken,
+      });
+    } catch (e) {
+      console.error('Revoke error:', e);
+    }
   }
   req.session.destroy();
-  res.redirect('/');
+  res.json({ success: true });
 });
 
 app.listen(3000, () => {
@@ -618,46 +663,38 @@ app.listen(3000, () => {
 
 ```python
 # main.py
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 import httpx
 import secrets
-import asyncio
 
 app = FastAPI()
 
-IDP_BASE_URL = "http://localhost:5000"
+IDP_BASE_URL = "https://unionlogin.coze.site"
 CLIENT_ID = "your_client_id"
 CLIENT_SECRET = "your_client_secret"
-REDIRECT_URI = "http://localhost:8000/auth/callback"
+REDIRECT_URI = "https://your-app.com/auth/callback"
 
 sessions = {}
 
 
-class TokenData(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str
-    expires_in: int
-
-
 # 登录入口
 @app.get("/auth/login")
-async def login():
+async def login(request: Request):
     state = secrets.token_hex(16)
     sessions["oauth_state"] = state
     
     params = {
-        "clientId": CLIENT_ID,
-        "redirectUri": REDIRECT_URI,
-        "responseType": "code",
+        "client_id": CLIENT_ID,
+        "redirect_uri": REDIRECT_URI,
+        "response_type": "code",
         "scope": "openid profile email",
         "state": state,
     }
     
-    auth_url = f"{IDP_BASE_URL}/api/auth/authorize"
-    return RedirectResponse(f"{auth_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}")
+    query_string = "&".join(f"{k}={v}" for k, v in params.items())
+    return RedirectResponse(f"{IDP_BASE_URL}/api/auth/authorize?{query_string}")
 
 
 # 回调处理
@@ -674,18 +711,18 @@ async def callback(code: str, state: str, error: str = None):
         token_response = await client.post(
             f"{IDP_BASE_URL}/api/auth/token",
             json={
-                "grantType": "authorization_code",
-                "clientId": CLIENT_ID,
-                "clientSecret": CLIENT_SECRET,
+                "grant_type": "authorization_code",
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
                 "code": code,
-                "redirectUri": REDIRECT_URI,
+                "redirect_uri": REDIRECT_URI,
             },
         )
         
         if token_response.status_code != 200:
             raise HTTPException(status_code=400, detail="Token exchange failed")
         
-        token_data = token_response.json()["data"]
+        token_data = token_response.json()
         
         # 获取用户信息
         user_response = await client.get(
@@ -693,7 +730,7 @@ async def callback(code: str, state: str, error: str = None):
             headers={"Authorization": f"Bearer {token_data['access_token']}"},
         )
         
-        user_info = user_response.json()["data"]
+        user_info = user_response.json()
         
         sessions["user"] = {
             **user_info,
@@ -713,7 +750,7 @@ async def get_me():
 
 
 # 登出
-@app.get("/auth/logout")
+@app.post("/auth/logout")
 async def logout():
     user = sessions.pop("user", None)
     if user:
@@ -742,21 +779,20 @@ if __name__ == "__main__":
 2. 点击 "New OAuth App"
 3. 填写信息：
    - Application name: Your App Name
-   - Homepage URL: http://localhost:3000
-   - Authorization callback URL: http://localhost:5000/api/auth/github/callback
+   - Homepage URL: https://your-app.com
+   - Authorization callback URL: https://unionlogin.coze.site/api/auth/github/callback
 
 **Step 2: 配置环境变量**
 
 ```env
 GITHUB_CLIENT_ID=your_github_client_id
 GITHUB_CLIENT_SECRET=your_github_client_secret
-GITHUB_CALLBACK_URL=http://localhost:5000/api/auth/github/callback
 ```
 
 **Step 3: 前端调用**
 
 ```html
-<a href="http://localhost:5000/api/auth/github">使用 GitHub 登录</a>
+<a href="https://unionlogin.coze.site/api/auth/github">使用 GitHub 登录</a>
 ```
 
 ### 6.2 Google 登录
@@ -765,41 +801,19 @@ GITHUB_CALLBACK_URL=http://localhost:5000/api/auth/github/callback
 
 1. 访问 https://console.cloud.google.com/apis/credentials
 2. 创建 OAuth 2.0 Client ID
-3. 配置Authorized redirect URI: http://localhost:5000/api/auth/google/callback
+3. 配置 Authorized redirect URI: https://unionlogin.coze.site/api/auth/google/callback
 
 **Step 2: 配置环境变量**
 
 ```env
 GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
 ```
 
 **Step 3: 前端调用**
 
 ```html
-<a href="http://localhost:5000/api/auth/google">使用 Google 登录</a>
-```
-
-### 6.3 微信登录
-
-**Step 1: 申请微信开放平台账号**
-
-1. 访问 https://open.weixin.qq.com
-2. 创建网站应用并获取 AppID 和 AppSecret
-
-**Step 2: 配置环境变量**
-
-```env
-WECHAT_APP_ID=your_wechat_app_id
-WECHAT_APP_SECRET=your_wechat_app_secret
-WECHAT_CALLBACK_URL=http://localhost:5000/api/auth/wechat/callback
-```
-
-**Step 3: 前端调用**
-
-```html
-<a href="http://localhost:5000/api/auth/wechat">使用微信登录</a>
+<a href="https://unionlogin.coze.site/api/auth/google">使用 Google 登录</a>
 ```
 
 ---
@@ -820,17 +834,23 @@ Refresh Token 有效期为 7 天。如果 Refresh Token 也过期了，用户需
 
 ### Q4: 如何实现强制登出？
 
-1. 调用 `/api/users/sessions` 获取所有会话
-2. 调用 `/api/users/sessions/:sessionId` 删除指定会话
+调用 `/api/auth/revoke` 接口撤销 Token。
 
 ### Q5: 多租户模式下如何隔离用户？
 
-- 在请求 Header 中添加 `X-Tenant-Id` 或在 URL 中添加 `tenantId` 参数
+- 在请求 Header 中添加 `X-Tenant-Id`
+- 或在 URL 中添加 `tenantId` 参数
 - 系统会根据租户 ID 自动隔离用户数据
 
-### Q6: 如何扩展第三方登录？
+### Q6: 如何获取 Client Secret？
 
-参考 `src/modules/third-party/third-party.service.ts`，实现对应的 OAuth 流程即可。
+创建应用时会返回 Client Secret。之后可以通过以下方式获取：
+- 调用 `GET /api/apps/:clientId/secret` 接口
+- 在管理后台点击"查看密钥"按钮
+
+### Q7: 如何重新生成 Client Secret？
+
+调用 `POST /api/apps/:clientId/regenerate-secret` 接口重新生成密钥。
 
 ---
 
