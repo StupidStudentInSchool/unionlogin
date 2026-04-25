@@ -84,4 +84,15 @@ export class UsersController {
     const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
     return usersService.getUsers(tenantId, parseInt(page), parseInt(pageSize));
   }
+
+  @UseGuards(AuthGuard)
+  @Put(':id/department')
+  @ApiOperation({ summary: '分配用户部门' })
+  async assignDepartment(
+    @Param('id') userId: string,
+    @Body() body: { departmentId: string | null },
+  ) {
+    await usersService.assignDepartment(userId, body.departmentId);
+    return { success: true };
+  }
 }

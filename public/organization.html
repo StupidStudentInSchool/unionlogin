@@ -90,6 +90,7 @@
               <th>角色</th>
               <th>状态</th>
               <th>创建时间</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody id="user-table-body"></tbody>
@@ -174,6 +175,29 @@
       <div class="modal-action">
         <button type="button" class="btn" onclick="document.getElementById('user-role-modal').close()">取消</button>
         <button type="button" class="btn btn-primary" onclick="saveUserRoles()">保存</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
+
+  <!-- 用户分配部门弹窗 -->
+  <dialog id="user-dept-modal" class="modal">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">分配部门</h3>
+      <input type="hidden" id="dept-user-id">
+      <div class="form-control mt-4">
+        <label class="label"><span class="label-text">用户名</span></label>
+        <span id="dept-user-name" class="text-lg font-medium"></span>
+      </div>
+      <div class="form-control mt-4">
+        <label class="label"><span class="label-text">选择部门</span></label>
+        <select id="select-dept-for-user" class="select select-bordered">
+          <option value="">-- 无部门 --</option>
+        </select>
+      </div>
+      <div class="modal-action">
+        <button type="button" class="btn" onclick="document.getElementById('user-dept-modal').close()">取消</button>
+        <button type="button" class="btn btn-primary" onclick="saveUserDepartment()">保存</button>
       </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -588,46 +612,66 @@
             <td>${roleBadges || '<span class="text-gray-400">无</span>'}</td>
             <td><span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-error'}">${user.status === 'active' ? '正常' : '禁用'}</span></td>
             <td>${new Date(user.created_at).toLocaleDateString()}</td>
+            <td>
+              <div class="flex gap-1">
+                <button class="btn btn-xs btn-ghost" onclick="showUserDeptModal('${user.id}')">分配部门</button>
+                <button class="btn btn-xs btn-ghost" onclick="showUserRoleModal('${user.id}')">分配角色</button>
+              </div>
+            </td>
           </tr>
         `;
       }).join('');
     }
 
-    function showUserRoleModal() {
-      if (users.length === 0) {
-        showToast('暂无用户', 'error');
-        return;
+    // 分配部门
+    function showUserDeptModal(userId) {
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
+
+      document.getElementById('dept-user-id').value = userId;
+      document.getElementById('dept-user-name').textContent = `${user.username} (${user.email})`;
+
+      // 渲染部门选项
+      const select = document.getElementById('select-dept-for-user');
+      select.innerHTML = `<option value="">-- 无部门 --</option>` +
+        departments.map(d => `<option value="${d.id}" ${user.department_id === d.id ? 'selected' : ''}>${d.name}</option>`).join('');
+
+      document.getElementById('user-dept-modal').showModal();
+    }
+
+    async function saveUserDepartment() {
+      const userId = document.getElementById('dept-user-id').value;
+      const departmentId = document.getElementById('select-dept-for-user').value || null;
+
+      try {
+        const res = await fetch(`${API}/api/users/${userId}/department`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify({ departmentId })
+        });
+        const result = await res.json();
+        if (result.success) {
+          document.getElementById('user-dept-modal').close();
+          loadUsers();
+          showToast('部门分配成功');
+        } else {
+          showToast(result.error || '操作失败', 'error');
+        }
+      } catch (err) {
+        showToast('操作失败', 'error');
       }
+    }
 
-      // 选择用户
-      const userOptions = users.map(u => `<option value="${u.id}">${u.username} (${u.email})</option>`).join('');
-      const userSelectHtml = `
-        <div class="form-control mt-4">
-          <label class="label"><span class="label-text">选择用户 *</span></label>
-          <select id="select-user-for-role" class="select select-bordered" onchange="loadUserRoles(this.value)">
-            <option value="">-- 选择用户 --</option>
-            ${userOptions}
-          </select>
-        </div>
-      `;
+    // 分配角色
+    function showUserRoleModal(userId) {
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
 
-      const modal = document.getElementById('user-role-modal');
-      modal.querySelector('.modal-box').innerHTML = `
-        <h3 class="font-bold text-lg">分配角色</h3>
-        ${userSelectHtml}
-        <div class="form-control mt-4">
-          <label class="label"><span class="label-text">选择角色</span></label>
-          <div id="role-checkboxes" class="space-y-2">
-            <p class="text-gray-500">请先选择用户</p>
-          </div>
-        </div>
-        <div class="modal-action">
-          <button type="button" class="btn" onclick="user-role-modal.close()">取消</button>
-          <button type="button" class="btn btn-primary" onclick="saveUserRoles()">保存</button>
-        </div>
-      `;
+      document.getElementById('role-user-id').value = userId;
+      document.getElementById('role-user-name').textContent = `${user.username} (${user.email})`;
 
-      modal.showModal();
+      loadUserRoles(userId);
+      document.getElementById('user-role-modal').showModal();
     }
 
     async function loadUserRoles(userId) {
@@ -656,7 +700,7 @@
     }
 
     async function saveUserRoles() {
-      const userId = document.getElementById('select-user-for-role')?.value;
+      const userId = document.getElementById('role-user-id')?.value;
       if (!userId) {
         showToast('请选择用户', 'error');
         return;

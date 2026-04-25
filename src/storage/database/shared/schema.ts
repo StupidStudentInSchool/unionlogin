@@ -19,12 +19,31 @@ export const tenants = pgTable(
   ]
 );
 
+// 部门表
+export const departments = pgTable(
+  "departments",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    tenant_id: varchar("tenant_id", { length: 36 }).references(() => tenants.id),
+    name: varchar("name", { length: 128 }).notNull(),
+    parent_id: varchar("parent_id", { length: 36 }),
+    description: text("description"),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp("updated_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("departments_tenant_id_idx").on(table.tenant_id),
+    index("departments_parent_id_idx").on(table.parent_id),
+  ]
+);
+
 // 用户表
 export const users = pgTable(
   "users",
   {
     id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
     tenant_id: varchar("tenant_id", { length: 36 }).references(() => tenants.id),
+    department_id: varchar("department_id", { length: 36 }).references(() => departments.id),
     username: varchar("username", { length: 64 }).notNull().unique(),
     email: varchar("email", { length: 255 }).notNull(),
     password_hash: varchar("password_hash", { length: 255 }),
@@ -40,6 +59,7 @@ export const users = pgTable(
   },
   (table) => [
     index("users_tenant_id_idx").on(table.tenant_id),
+    index("users_department_id_idx").on(table.department_id),
     index("users_email_idx").on(table.email),
     index("users_username_idx").on(table.username),
     index("users_status_idx").on(table.status),
@@ -180,3 +200,6 @@ export type InsertAuditLog = typeof audit_logs.$inferInsert;
 
 export type ThirdPartyAccount = typeof third_party_accounts.$inferSelect;
 export type InsertThirdPartyAccount = typeof third_party_accounts.$inferInsert;
+
+export type Department = typeof departments.$inferSelect;
+export type InsertDepartment = typeof departments.$inferInsert;

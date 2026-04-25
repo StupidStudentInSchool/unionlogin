@@ -328,12 +328,16 @@ export class UsersService {
     const { data, error, count } = await query;
     if (error) throw new Error(`查询用户失败: ${error.message}`);
     
-    // 获取所有用户的角色 ID
+    // 获取所有用户的角色 ID 和部门 ID
     const users = (data || []) as any[];
     const allRoleIds: string[] = [];
+    const allDeptIds: string[] = [];
     users.forEach(u => {
       const roleIds = u.metadata?.roles || [];
       allRoleIds.push(...roleIds);
+      if (u.department_id) {
+        allDeptIds.push(u.department_id);
+      }
     });
     
     // 查询角色信息
@@ -351,7 +355,22 @@ export class UsersService {
       }
     }
     
-    // 组装返回数据，包含角色名称
+    // 查询部门信息
+    let deptMap: Record<string, string> = {};
+    if (allDeptIds.length > 0) {
+      const { data: depts } = await client
+        .from('departments')
+        .select('id, name')
+        .in('id', [...new Set(allDeptIds)]);
+      
+      if (depts) {
+        depts.forEach(d => {
+          deptMap[d.id] = d.name;
+        });
+      }
+    }
+    
+    // 组装返回数据，包含角色名称和部门名称
     const usersWithRoles = users.map(u => {
       const roleIds = u.metadata?.roles || [];
       const roles = roleIds.map((id: string) => roleMap[id]).filter(Boolean);
@@ -359,10 +378,36 @@ export class UsersService {
         ...u,
         roles,
         roleNames: roles.map((r: any) => r.name).join(', '),
+        department_name: u.department_id ? deptMap[u.department_id] || null : null,
       };
     });
     
     return { list: usersWithRoles, total: count || 0 };
+  }
+
+  // 分配用户部门
+  async assignDepartment(userId: string, departmentId: string | null): Promise<void> {
+    const user = await userService.findById(userId);
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+
+    // 如果指定了部门，验证部门是否存在
+    if (departmentId) {
+      const dept = await departmentService.findById(departmentId);
+      if (!dept) {
+        throw new Error('部门不存在');
+      }
+    }
+
+    // 更新用户的部门
+    await userService.update(userId, { department_id: departmentId } as any);
+
+    await auditService.create({
+      event_type: 'department_assign',
+      user_id: userId,
+      metadata: { department_id: departmentId },
+    });
   }
 }
 
