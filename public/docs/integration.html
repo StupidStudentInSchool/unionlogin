@@ -581,9 +581,10 @@ Content-Type: application/json
   </div>
 
   <script>
-    // 动态获取当前域名并更新配置
+    // 使用生产环境域名配置
     (function() {
-      const baseUrl = window.location.origin;
+      // 生产环境固定域名
+      const baseUrl = 'https://unionlogin.coze.site';
       
       // 更新配置显示
       document.getElementById('config-base-url').textContent = baseUrl;
