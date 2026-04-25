@@ -219,13 +219,20 @@
 
     async function init() {
       // 检查登录
-      if (!localStorage.getItem(STORAGE_KEYS.token)) {
+      const token = localStorage.getItem(STORAGE_KEYS.token);
+      console.log('[DASHBOARD] token:', token ? token.substring(0, 20) + '...' : 'null');
+      
+      if (!token) {
+        console.log('[DASHBOARD] 没有 token，跳转登录');
         window.location.href = '/login.html';
         return;
       }
 
       // 显示用户信息
       const user = JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || '{}');
+      console.log('[DASHBOARD] user:', user.username);
+      console.log('[DASHBOARD] tenant:', localStorage.getItem(STORAGE_KEYS.tenant));
+      
       document.getElementById('username').textContent = user.username || '用户';
       document.getElementById('avatar').textContent = (user.username || 'U')[0].toUpperCase();
 
@@ -236,7 +243,13 @@
     async function loadApps() {
       try {
         console.log('[DEBUG] loadApps called');
-        const res = await fetch(`${API}/api/apps`, { headers: getHeaders() });
+        const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
+        const headers = getHeaders();
+        console.log('[DEBUG] tenant:', tenant);
+        console.log('[DEBUG] headers:', { ...headers, Authorization: headers.Authorization?.substring(0, 30) + '...' });
+        
+        const url = tenant ? `${API}/api/apps?tenantId=${tenant}` : `${API}/api/apps`;
+        const res = await fetch(url, { headers });
         if (handleAuthError(res)) return;
         console.log('[DEBUG] response status:', res.status);
         const data = await res.json();
@@ -254,7 +267,11 @@
     async function loadUsers() {
       try {
         console.log('[DEBUG] loadUsers called');
-        const res = await fetch(`${API}/api/users`, { headers: getHeaders() });
+        const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
+        const headers = getHeaders();
+        
+        const url = tenant ? `${API}/api/users?tenantId=${tenant}` : `${API}/api/users`;
+        const res = await fetch(url, { headers });
         if (handleAuthError(res)) return;
         console.log('[DEBUG] response status:', res.status);
         const data = await res.json();

@@ -227,8 +227,14 @@
     }
 
     function checkAuth() {
+      const token = localStorage.getItem(STORAGE_KEYS.token);
       const user = JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || '{}');
-      if (!user || !user.id) {
+      console.log('[ORG] token:', token ? token.substring(0, 20) + '...' : 'null');
+      console.log('[ORG] user:', user.username);
+      console.log('[ORG] tenant:', localStorage.getItem(STORAGE_KEYS.tenant));
+      
+      if (!token || !user || !user.id) {
+        console.log('[ORG] 认证失败，跳转登录');
         window.location.href = '/login.html';
         return;
       }

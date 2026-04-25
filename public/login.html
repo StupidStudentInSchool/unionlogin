@@ -139,6 +139,14 @@
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
 
+      // 验证必须选择租户
+      if (!tenantId) {
+        showError('请选择租户');
+        btn.disabled = false;
+        btn.textContent = '登录';
+        return;
+      }
+
       try {
         const res = await fetch(`${API}/api/users/login`, {
           method: 'POST',
@@ -155,6 +163,8 @@
           localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken || '');
           localStorage.setItem(STORAGE_KEYS.tenant, actualTenantId || '');
           localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user || {}));
+          console.log('[LOGIN] 保存成功, token:', loginData.accessToken?.substring(0, 20) + '...');
+          console.log('[LOGIN] tenant:', actualTenantId);
           window.location.href = '/dashboard.html';
         } else {
           showError(data.message || '登录失败');
