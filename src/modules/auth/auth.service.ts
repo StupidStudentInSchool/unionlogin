@@ -20,8 +20,8 @@ export class AuthService {
     const codeData = JSON.stringify({ clientId, redirectUri, userId, scopes });
     await sessionService.create({
       user_id: userId,
-      access_token: `code_${code}`,
-      refresh_token: codeData,
+      token_hash: `code_${code}`,
+      refresh_token_hash: codeData,
       ip_address: '',
       user_agent: '',
       expires_at: new Date(Date.now() + 5 * 60 * 1000),
@@ -61,8 +61,8 @@ export class AuthService {
     // 创建会话
     await sessionService.create({
       user_id: codeData.userId,
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      token_hash: accessToken,
+      refresh_token_hash: refreshToken,
       ip_address: '',
       user_agent: '',
       expires_at: expiresAt,

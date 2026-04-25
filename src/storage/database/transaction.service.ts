@@ -112,24 +112,29 @@ export class TransactionService {
       const refreshToken = crypto.randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1小时后过期
 
-      const { error: sessionError } = await this.client
+      console.log('DEBUG: 尝试创建 session，user_id:', newUser.id);
+      
+      const { data: sessionData, error: sessionError } = await this.client
         .from('user_sessions')
         .insert({
           user_id: newUser.id,
-          tenant_id: newTenant.id,
-          access_token: accessToken,
-          refresh_token: refreshToken,
+          token_hash: accessToken,
+          refresh_token_hash: refreshToken,
           expires_at: expiresAt.toISOString(),
           ip_address: '0.0.0.0',
           user_agent: 'System',
-        });
+        })
+        .select()
+        .single();
+
+      console.log('DEBUG: session 插入结果 - data:', sessionData, 'error:', sessionError);
 
       if (sessionError) {
-        console.warn('⚠️ 创建 session 失败:', sessionError.message);
+        console.warn('⚠️ 创建 session 失败:', JSON.stringify(sessionError));
       } else {
         results.accessToken = accessToken;
         results.refreshToken = refreshToken;
-        console.log('✅ Session 创建成功');
+        console.log('✅ Session 创建成功, token:', accessToken.substring(0, 10) + '...');
       }
 
       return results;

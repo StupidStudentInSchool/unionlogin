@@ -166,19 +166,21 @@ export class SessionService {
   }
 
   async findByAccessToken(accessToken: string): Promise<UserSession | null> {
-    const { data, error } = await this.client.from('user_sessions').select('*').eq('access_token', accessToken).maybeSingle();
+    // token 存储在 token_hash 字段中
+    const { data, error } = await this.client.from('user_sessions').select('*').eq('token_hash', accessToken).maybeSingle();
     if (error) throw new Error(`查询会话失败: ${error.message}`);
     return data as UserSession | null;
   }
 
   async findByRefreshToken(refreshToken: string): Promise<UserSession | null> {
-    const { data, error } = await this.client.from('user_sessions').select('*').eq('refresh_token', refreshToken).maybeSingle();
+    // refresh_token 存储在 refresh_token_hash 字段中
+    const { data, error } = await this.client.from('user_sessions').select('*').eq('refresh_token_hash', refreshToken).maybeSingle();
     if (error) throw new Error(`查询会话失败: ${error.message}`);
     return data as UserSession | null;
   }
 
   async delete(accessToken: string): Promise<void> {
-    const { error } = await this.client.from('user_sessions').delete().eq('access_token', accessToken);
+    const { error } = await this.client.from('user_sessions').delete().eq('token_hash', accessToken);
     if (error) throw new Error(`删除会话失败: ${error.message}`);
   }
 

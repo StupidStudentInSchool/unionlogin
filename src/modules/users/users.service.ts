@@ -96,8 +96,8 @@ export class UsersService {
     const client = getSupabaseClient();
     await client.from('user_sessions').insert({
       user_id: user.id,
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      token_hash: accessToken,
+      refresh_token_hash: refreshToken,
       ip_address: ipAddress || '',
       user_agent: userAgent || '',
       expires_at: expiresAt.toISOString(),
