@@ -316,7 +316,7 @@ export class UsersService {
   }
 
   // 获取所有用户（管理后台）
-  async getUsers(tenantId?: string, page = 1, pageSize = 20): Promise<{ list: User[]; total: number }> {
+  async getUsers(tenantId?: string, page = 1, pageSize = 20): Promise<{ list: any[]; total: number }> {
     const client = getSupabaseClient();
     let query = client.from('users').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
     
@@ -328,7 +328,41 @@ export class UsersService {
     const { data, error, count } = await query;
     if (error) throw new Error(`查询用户失败: ${error.message}`);
     
-    return { list: (data || []) as User[], total: count || 0 };
+    // 获取所有用户的角色 ID
+    const users = (data || []) as any[];
+    const allRoleIds: string[] = [];
+    users.forEach(u => {
+      const roleIds = u.metadata?.roles || [];
+      allRoleIds.push(...roleIds);
+    });
+    
+    // 查询角色信息
+    let roleMap: Record<string, { name: string; code: string }> = {};
+    if (allRoleIds.length > 0) {
+      const { data: roles } = await client
+        .from('roles')
+        .select('id, name, code')
+        .in('id', [...new Set(allRoleIds)]);
+      
+      if (roles) {
+        roles.forEach(r => {
+          roleMap[r.id] = { name: r.name, code: r.code };
+        });
+      }
+    }
+    
+    // 组装返回数据，包含角色名称
+    const usersWithRoles = users.map(u => {
+      const roleIds = u.metadata?.roles || [];
+      const roles = roleIds.map((id: string) => roleMap[id]).filter(Boolean);
+      return {
+        ...u,
+        roles,
+        roleNames: roles.map((r: any) => r.name).join(', '),
+      };
+    });
+    
+    return { list: usersWithRoles, total: count || 0 };
   }
 }
 

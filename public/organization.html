@@ -570,31 +570,15 @@
       }
     }
 
-    async function renderUsers() {
+    function renderUsers() {
       const tbody = document.getElementById('user-table-body');
 
-      // 获取所有用户的角色
-      const userRolesPromises = users.map(async user => {
-        try {
-          const res = await fetch(`${API}/api/roles/user/${user.id}`, { headers: getHeaders() });
-          const data = await res.json();
-          return { userId: user.id, roles: data.data || [] };
-        } catch {
-          return { userId: user.id, roles: [] };
-        }
-      });
-
-      const userRolesList = await Promise.all(userRolesPromises);
-      const userRolesMap = {};
-      userRolesList.forEach(item => {
-        userRolesMap[item.userId] = item.roles;
-      });
-
       tbody.innerHTML = users.map(user => {
-        const userRoles = userRolesMap[user.id] || [];
+        // 使用后端直接返回的角色数据
+        const userRoles = user.roles || [];
         const roleBadges = userRoles.map(r =>
           `<span class="badge badge-sm ${r.code === 'admin' ? 'badge-error' : 'badge-info'}">${r.name}</span>`
-        ).join('');
+        ).join('') || user.roleNames || '';
 
         return `
           <tr>
