@@ -490,7 +490,7 @@
         
         if (data.clientSecret) {
           showClientSecretModal('应用（新密钥）', clientId, data.clientSecret);
-          showToast('密钥已重新生成，旧密钥已失效', 'success');
+          alert('密钥已重新生成，旧密钥已失效');
         }
       } catch (err) {
         console.error('重新生成密钥失败:', err);
