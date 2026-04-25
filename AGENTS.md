@@ -148,3 +148,28 @@ if (error) throw new Error(`查询失败: ${error.message}`);
 - 多租户模式：请求 Header 中添加 `X-Tenant-Id`
 - Token 存储在数据库中，默认 Access Token 1小时过期，Refresh Token 7天过期
 - 授权码有效期 5 分钟，一次性使用
+
+## 第三方系统对接
+
+详细的对接指南请参阅：[Integration Guide](./public/docs/integration-guide.md)
+
+### 快速对接流程
+
+1. **注册应用**：在管理后台创建应用，获取 `client_id` 和 `client_secret`
+2. **配置回调**：设置 `redirect_uri` 回调地址
+3. **实现 OAuth 2.0 授权码流程**：
+   - 引导用户到 `/api/auth/authorize`
+   - 接收授权码回调
+   - 用授权码调用 `/api/auth/token` 换取 Token
+   - 调用 `/api/auth/userinfo` 获取用户信息
+
+### 主要 API 端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/auth/authorize` | GET | OAuth 授权入口 |
+| `/api/auth/token` | POST | 换取/刷新 Token |
+| `/api/auth/userinfo` | GET | 获取用户信息 |
+| `/api/auth/introspect` | POST | 验证 Token |
+| `/api/auth/revoke` | POST | 撤销 Token |
+| `/api/auth/logout` | POST | 单点登出 |
