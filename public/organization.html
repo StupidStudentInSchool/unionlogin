@@ -182,9 +182,10 @@
   <script>
     const API = window.location.origin;
     const STORAGE_KEYS = {
-      token: 'ic_token',
-      user: 'ic_user',
-      tenant: 'ic_tenant'
+      token: 'idc_access_token',
+      refresh: 'idc_refresh_token',
+      user: 'idc_user',
+      tenant: 'idc_tenant_id'
     };
 
     let currentTab = 'departments';
