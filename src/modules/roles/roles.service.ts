@@ -174,11 +174,13 @@ export class RolesService {
       return [];
     }
 
-    // 查询角色代码
+    // 查询角色代码 - 使用 or 条件匹配 UUID
+    // Supabase 对 UUID 类型查询需要特殊处理
+    const orConditions = roleIds.map((id) => `id.eq.${id}`).join(',');
     const { data: roles } = await this.client
       .from('roles')
       .select('code')
-      .in('id', roleIds);
+      .or(orConditions);
 
     return (roles || []).map((r) => r.code);
   }
