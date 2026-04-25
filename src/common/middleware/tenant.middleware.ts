@@ -6,11 +6,11 @@ export class TenantMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     // 使用 baseUrl + path 或者直接使用 originalUrl
     const url = req.originalUrl || req.url;
-    
+
     // 公开接口路径（不需要租户标识）
     const publicPaths = [
       'github',
-      'google', 
+      'google',
       'wechat',
       'authorize',
       'token',
@@ -21,19 +21,18 @@ export class TenantMiddleware implements NestMiddleware {
       'tenants',
     ];
 
-    const isPublic = publicPaths.some(publicPath => 
-      url.includes(publicPath)
-    );
+    const isPublic = publicPaths.some((publicPath) => url.includes(publicPath));
 
     if (isPublic) {
-      (req as any).tenantId = req.headers['x-tenant-id'] as string || 'default';
+      (req as any).tenantId =
+        (req.headers['x-tenant-id'] as string) || 'default';
       return next();
     }
 
     // 从 Header、Query 或 subdomain 获取租户ID
-    const tenantId = 
-      req.headers['x-tenant-id'] as string ||
-      req.query['tenantId'] as string ||
+    const tenantId =
+      (req.headers['x-tenant-id'] as string) ||
+      (req.query['tenantId'] as string) ||
       this.extractSubdomain(req);
 
     if (!tenantId) {
@@ -51,11 +50,11 @@ export class TenantMiddleware implements NestMiddleware {
   private extractSubdomain(req: Request): string | undefined {
     const host = req.get('host') || '';
     const parts = host.split('.');
-    
+
     if (parts.length >= 3) {
       return parts[0];
     }
-    
+
     return undefined;
   }
 }

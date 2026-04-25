@@ -1,23 +1,26 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/auth.decorator';
 import { sessionService } from '../../storage/database/services';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(
-    private reflector: Reflector,
-  ) {}
+  constructor(private reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    
+
     // 公开接口跳过认证
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    
+
     if (isPublic) {
       return true;
     }
@@ -36,7 +39,7 @@ export class AuthGuard implements CanActivate {
     // 验证 Token
     try {
       const introspection = await sessionService.findByAccessToken(token);
-      
+
       if (!introspection) {
         throw new UnauthorizedException('Token 无效');
       }
@@ -48,11 +51,11 @@ export class AuthGuard implements CanActivate {
       }
 
       // 将用户信息挂载到 request 上
-      (request as any).user = {
+      request.user = {
         userId: introspection.user_id,
         accessToken: token,
       };
-      
+
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) {

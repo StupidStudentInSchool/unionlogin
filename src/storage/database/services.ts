@@ -1,25 +1,43 @@
 import { getSupabaseClient, createNewClient } from './supabase-client';
 export { getSupabaseClient, createNewClient };
 import * as bcrypt from 'bcryptjs';
-import type { User, Tenant, OAuthClient, AuditLog, ThirdPartyAccount, UserSession } from './shared/schema';
+import type {
+  User,
+  Tenant,
+  OAuthClient,
+  AuditLog,
+  ThirdPartyAccount,
+  UserSession,
+} from './shared/schema';
 
 // 用户服务
 export class UserService {
   private client = getSupabaseClient();
 
   async create(data: any): Promise<User> {
-    const { data: user, error } = await this.client.from('users').insert(data).select().single();
+    const { data: user, error } = await this.client
+      .from('users')
+      .insert(data)
+      .select()
+      .single();
     if (error) throw new Error(`创建用户失败: ${error.message}`);
     return user as User;
   }
 
   async findById(id: string): Promise<User | null> {
-    const { data, error } = await this.client.from('users').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.client
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
     if (error) throw new Error(`查询用户失败: ${error.message}`);
     return data as User | null;
   }
 
-  async findByUsername(username: string, tenantId?: string): Promise<User | null> {
+  async findByUsername(
+    username: string,
+    tenantId?: string,
+  ): Promise<User | null> {
     let query = this.client.from('users').select('*').eq('username', username);
     if (tenantId) {
       query = query.eq('tenant_id', tenantId);
@@ -40,7 +58,12 @@ export class UserService {
   }
 
   async update(id: string, data: Partial<User>): Promise<User> {
-    const { data: user, error } = await this.client.from('users').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    const { data: user, error } = await this.client
+      .from('users')
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw new Error(`更新用户失败: ${error.message}`);
     return user as User;
   }
@@ -55,10 +78,13 @@ export class UserService {
   }
 
   async updateLoginInfo(id: string, ipAddress: string): Promise<void> {
-    await this.client.from('users').update({
-      last_login_at: new Date().toISOString(),
-      last_login_ip: ipAddress,
-    }).eq('id', id);
+    await this.client
+      .from('users')
+      .update({
+        last_login_at: new Date().toISOString(),
+        last_login_ip: ipAddress,
+      })
+      .eq('id', id);
   }
 }
 
@@ -72,7 +98,11 @@ export class TenantService {
     if (existing) {
       throw new Error('该租户标识已被使用');
     }
-    const { data: tenant, error } = await this.client.from('tenants').insert(data).select().single();
+    const { data: tenant, error } = await this.client
+      .from('tenants')
+      .insert(data)
+      .select()
+      .single();
     if (error) {
       // 可能是数据库层面的唯一约束冲突
       if (error.code === '23505') {
@@ -84,19 +114,30 @@ export class TenantService {
   }
 
   async findById(id: string): Promise<Tenant | null> {
-    const { data, error } = await this.client.from('tenants').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.client
+      .from('tenants')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
     if (error) throw new Error(`查询租户失败: ${error.message}`);
     return data as Tenant | null;
   }
 
   async findBySlug(slug: string): Promise<Tenant | null> {
-    const { data, error } = await this.client.from('tenants').select('*').eq('slug', slug).maybeSingle();
+    const { data, error } = await this.client
+      .from('tenants')
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle();
     if (error) throw new Error(`查询租户失败: ${error.message}`);
     return data as Tenant | null;
   }
 
   async findAll(): Promise<Tenant[]> {
-    const { data, error } = await this.client.from('tenants').select('*').order('created_at', { ascending: false });
+    const { data, error } = await this.client
+      .from('tenants')
+      .select('*')
+      .order('created_at', { ascending: false });
     if (error) throw new Error(`查询租户列表失败: ${error.message}`);
     return (data || []) as Tenant[];
   }
@@ -107,27 +148,47 @@ export class OAuthClientService {
   private client = getSupabaseClient();
 
   async create(data: any): Promise<OAuthClient> {
-    const { data: oauthClient, error } = await this.client.from('oauth_clients').insert(data).select().single();
+    const { data: oauthClient, error } = await this.client
+      .from('oauth_clients')
+      .insert(data)
+      .select()
+      .single();
     if (error) throw new Error(`创建OAuth客户端失败: ${error.message}`);
     return oauthClient as OAuthClient;
   }
 
   async findByClientId(clientId: string): Promise<OAuthClient | null> {
-    const { data, error } = await this.client.from('oauth_clients').select('*').eq('client_id', clientId).maybeSingle();
+    const { data, error } = await this.client
+      .from('oauth_clients')
+      .select('*')
+      .eq('client_id', clientId)
+      .maybeSingle();
     if (error) throw new Error(`查询OAuth客户端失败: ${error.message}`);
     return data as OAuthClient | null;
   }
 
   async findById(id: string): Promise<OAuthClient | null> {
-    const { data, error } = await this.client.from('oauth_clients').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.client
+      .from('oauth_clients')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
     if (error) throw new Error(`查询OAuth客户端失败: ${error.message}`);
     return data as OAuthClient | null;
   }
 
   async findAll(tenantId?: string): Promise<OAuthClient[]> {
-    let query = this.client.from('oauth_clients').select('*').order('created_at', { ascending: false });
+    let query = this.client
+      .from('oauth_clients')
+      .select('*')
+      .order('created_at', { ascending: false });
     // 只有当 tenantId 有效（不是 'default'、'null'、'undefined' 且不是 undefined）时才过滤
-    if (tenantId && tenantId !== 'default' && tenantId !== 'null' && tenantId !== 'undefined') {
+    if (
+      tenantId &&
+      tenantId !== 'default' &&
+      tenantId !== 'null' &&
+      tenantId !== 'undefined'
+    ) {
       query = query.eq('tenant_id', tenantId);
     }
     const { data, error } = await query;
@@ -140,7 +201,10 @@ export class OAuthClientService {
   }
 
   async deleteByClientId(clientId: string, tenantId?: string): Promise<void> {
-    let query = this.client.from('oauth_clients').delete().eq('client_id', clientId);
+    let query = this.client
+      .from('oauth_clients')
+      .delete()
+      .eq('client_id', clientId);
     if (tenantId) {
       query = query.eq('tenant_id', tenantId);
     }
@@ -148,10 +212,14 @@ export class OAuthClientService {
     if (error) throw new Error(`删除OAuth客户端失败: ${error.message}`);
   }
 
-  async update(clientId: string, data: any, tenantId?: string): Promise<OAuthClient> {
+  async update(
+    clientId: string,
+    data: any,
+    tenantId?: string,
+  ): Promise<OAuthClient> {
     const conditions: any = { client_id: clientId };
     if (tenantId) conditions.tenant_id = tenantId;
-    
+
     const { data: updated, error } = await this.client
       .from('oauth_clients')
       .update(data)
@@ -168,37 +236,58 @@ export class SessionService {
   private client = getSupabaseClient();
 
   async create(data: any): Promise<UserSession> {
-    const { data: session, error } = await this.client.from('user_sessions').insert(data).select().single();
+    const { data: session, error } = await this.client
+      .from('user_sessions')
+      .insert(data)
+      .select()
+      .single();
     if (error) throw new Error(`创建会话失败: ${error.message}`);
     return session as UserSession;
   }
 
   async findByAccessToken(accessToken: string): Promise<UserSession | null> {
     // token 存储在 token_hash 字段中
-    const { data, error } = await this.client.from('user_sessions').select('*').eq('token_hash', accessToken).maybeSingle();
+    const { data, error } = await this.client
+      .from('user_sessions')
+      .select('*')
+      .eq('token_hash', accessToken)
+      .maybeSingle();
     if (error) throw new Error(`查询会话失败: ${error.message}`);
     return data as UserSession | null;
   }
 
   async findByRefreshToken(refreshToken: string): Promise<UserSession | null> {
     // refresh_token 存储在 refresh_token_hash 字段中
-    const { data, error } = await this.client.from('user_sessions').select('*').eq('refresh_token_hash', refreshToken).maybeSingle();
+    const { data, error } = await this.client
+      .from('user_sessions')
+      .select('*')
+      .eq('refresh_token_hash', refreshToken)
+      .maybeSingle();
     if (error) throw new Error(`查询会话失败: ${error.message}`);
     return data as UserSession | null;
   }
 
   async delete(accessToken: string): Promise<void> {
-    const { error } = await this.client.from('user_sessions').delete().eq('token_hash', accessToken);
+    const { error } = await this.client
+      .from('user_sessions')
+      .delete()
+      .eq('token_hash', accessToken);
     if (error) throw new Error(`删除会话失败: ${error.message}`);
   }
 
   async deleteByUserId(userId: string): Promise<void> {
-    const { error } = await this.client.from('user_sessions').delete().eq('user_id', userId);
+    const { error } = await this.client
+      .from('user_sessions')
+      .delete()
+      .eq('user_id', userId);
     if (error) throw new Error(`删除用户会话失败: ${error.message}`);
   }
 
   async cleanExpired(): Promise<void> {
-    const { error } = await this.client.from('user_sessions').delete().lt('expires_at', new Date().toISOString());
+    const { error } = await this.client
+      .from('user_sessions')
+      .delete()
+      .lt('expires_at', new Date().toISOString());
     if (error) throw new Error(`清理过期会话失败: ${error.message}`);
   }
 }
@@ -230,18 +319,22 @@ export class AuditService {
     tenantId?: string;
   }): Promise<{ list: AuditLog[]; total: number }> {
     let query = this.client.from('audit_logs').select('*', { count: 'exact' });
-    
+
     if (params.tenantId) query = query.eq('tenant_id', params.tenantId);
     if (params.eventType) query = query.eq('event_type', params.eventType);
     if (params.userId) query = query.eq('user_id', params.userId);
     if (params.clientId) query = query.eq('client_id', params.clientId);
     if (params.startTime && params.endTime) {
-      query = query.gte('created_at', params.startTime).lte('created_at', params.endTime);
+      query = query
+        .gte('created_at', params.startTime)
+        .lte('created_at', params.endTime);
     }
 
     const page = params.page || 1;
     const pageSize = params.pageSize || 20;
-    query = query.order('created_at', { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
+    query = query
+      .order('created_at', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
 
     const { data, error, count } = await query;
     if (error) throw new Error(`查询审计日志失败: ${error.message}`);
@@ -254,12 +347,19 @@ export class ThirdPartyService {
   private client = getSupabaseClient();
 
   async create(data: any): Promise<ThirdPartyAccount> {
-    const { data: account, error } = await this.client.from('third_party_accounts').insert(data).select().single();
+    const { data: account, error } = await this.client
+      .from('third_party_accounts')
+      .insert(data)
+      .select()
+      .single();
     if (error) throw new Error(`创建第三方账户失败: ${error.message}`);
     return account as ThirdPartyAccount;
   }
 
-  async findByProvider(provider: string, providerUserId: string): Promise<ThirdPartyAccount | null> {
+  async findByProvider(
+    provider: string,
+    providerUserId: string,
+  ): Promise<ThirdPartyAccount | null> {
     const { data, error } = await this.client
       .from('third_party_accounts')
       .select('*, users(*)')
@@ -271,13 +371,20 @@ export class ThirdPartyService {
   }
 
   async findByUserId(userId: string): Promise<ThirdPartyAccount[]> {
-    const { data, error } = await this.client.from('third_party_accounts').select('*').eq('user_id', userId);
+    const { data, error } = await this.client
+      .from('third_party_accounts')
+      .select('*')
+      .eq('user_id', userId);
     if (error) throw new Error(`查询用户第三方账户失败: ${error.message}`);
     return (data || []) as ThirdPartyAccount[];
   }
 
   async delete(userId: string, provider: string): Promise<void> {
-    const { error } = await this.client.from('third_party_accounts').delete().eq('user_id', userId).eq('provider', provider);
+    const { error } = await this.client
+      .from('third_party_accounts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('provider', provider);
     if (error) throw new Error(`删除第三方账户失败: ${error.message}`);
   }
 
@@ -296,7 +403,9 @@ export class ThirdPartyService {
 export class RoleService {
   private client = getSupabaseClient();
 
-  async getUserRoles(userId: string): Promise<{ id: string; name: string; code: string }[]> {
+  async getUserRoles(
+    userId: string,
+  ): Promise<{ id: string; name: string; code: string }[]> {
     try {
       // 从 users 表的 metadata 字段获取角色
       const { data, error } = await this.client
@@ -335,7 +444,7 @@ export class RoleService {
       if (!user) throw new Error('用户不存在');
 
       const metadata = (user.metadata || {}) as Record<string, any>;
-      const roles = metadata.roles || [];
+      const roles = (metadata.roles || []) as any[];
 
       // 检查是否已存在
       if (roles.some((r: any) => r.id === roleId)) {

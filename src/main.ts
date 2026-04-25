@@ -8,21 +8,26 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  
+
   // 启用静态文件服务
   app.useStaticAssets(join(__dirname, '..', 'public'), {
     prefix: '/',
   });
-  
+
   // 不使用全局前缀，每个控制器手动添加 /api 前缀
-  
+
   // 在所有其他中间件之后添加租户中间件
   app.use((req: any, res: any, next: any) => {
-    console.log('[Tenant Middleware] URL:', req.url, 'Tenant:', req.headers['x-tenant-id'] || 'default');
+    console.log(
+      '[Tenant Middleware] URL:',
+      req.url,
+      'Tenant:',
+      req.headers['x-tenant-id'] || 'default',
+    );
     req.tenantId = req.headers['x-tenant-id'] || 'default';
     next();
   });
-  
+
   // 全局管道
   app.useGlobalPipes(
     new ValidationPipe({

@@ -93,7 +93,11 @@ export class RolesService {
   /**
    * 更新角色
    */
-  async update(id: string, tenantId: string, dto: UpdateRoleDto): Promise<Role> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateRoleDto,
+  ): Promise<Role> {
     const { data, error } = await this.client
       .from('roles')
       .update({
@@ -138,10 +142,12 @@ export class RolesService {
   async getUserRoles(userId: string): Promise<Role[]> {
     const { data, error } = await this.client
       .from('user_roles')
-      .select(`
+      .select(
+        `
         role_id,
         roles (*)
-      `)
+      `,
+      )
       .eq('user_id', userId);
 
     if (error) throw new Error(`查询用户角色失败: ${error.message}`);
@@ -153,10 +159,7 @@ export class RolesService {
    */
   async assignRoles(userId: string, roleIds: string[]): Promise<void> {
     // 先删除旧的角色
-    await this.client
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
+    await this.client.from('user_roles').delete().eq('user_id', userId);
 
     // 添加新的角色
     if (roleIds.length > 0) {
@@ -165,9 +168,7 @@ export class RolesService {
         role_id: roleId,
       }));
 
-      const { error } = await this.client
-        .from('user_roles')
-        .insert(inserts);
+      const { error } = await this.client.from('user_roles').insert(inserts);
 
       if (error) throw new Error(`分配角色失败: ${error.message}`);
     }

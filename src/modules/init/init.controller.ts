@@ -1,7 +1,10 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { transactionService } from '../../storage/database/transaction.service';
-import { auditService, getSupabaseClient } from '../../storage/database/services';
+import {
+  auditService,
+  getSupabaseClient,
+} from '../../storage/database/services';
 import { Public } from '../../common/decorators/auth.decorator';
 
 @ApiTags('初始化')
@@ -11,15 +14,24 @@ export class InitController {
   @Post()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '初始化系统（创建租户、管理员、默认应用和角色）' })
-  async initialize(@Body() body: {
-    tenantName: string;
-    tenantSlug: string;
-    username: string;
-    email: string;
-    password: string;
-  }) {
+  async initialize(
+    @Body()
+    body: {
+      tenantName: string;
+      tenantSlug: string;
+      username: string;
+      email: string;
+      password: string;
+    },
+  ) {
     // 验证输入
-    if (!body.tenantName || !body.tenantSlug || !body.username || !body.email || !body.password) {
+    if (
+      !body.tenantName ||
+      !body.tenantSlug ||
+      !body.username ||
+      !body.email ||
+      !body.password
+    ) {
       return { success: false, message: '请填写所有必填字段' };
     }
 
@@ -32,7 +44,10 @@ export class InitController {
     }
 
     if (!/^[a-z0-9-]+$/.test(body.tenantSlug)) {
-      return { success: false, message: '租户标识只能包含小写字母、数字和短横线' };
+      return {
+        success: false,
+        message: '租户标识只能包含小写字母、数字和短横线',
+      };
     }
 
     const client = getSupabaseClient();
@@ -41,35 +56,64 @@ export class InitController {
       // 执行带事务的初始化（包含创建 session）
       const result = await transactionService.initializeTenant({
         tenant: { name: body.tenantName, slug: body.tenantSlug },
-        admin: { username: body.username, email: body.email, password: body.password },
+        admin: {
+          username: body.username,
+          email: body.email,
+          password: body.password,
+        },
       });
 
       // 创建默认角色和部门
       const defaultRoles: any[] = [];
       const defaultDepts: any[] = [];
-      const defaultRole = { id: null as string | null, name: null as string | null, code: null as string | null };
-      const defaultDept = { id: null as string | null, name: null as string | null, code: null as string | null };
+      const defaultRole = {
+        id: null as string | null,
+        name: null as string | null,
+        code: null as string | null,
+      };
+      const defaultDept = {
+        id: null as string | null,
+        name: null as string | null,
+        code: null as string | null,
+      };
 
       // 系统权限定义
       const ALL_PERMISSIONS = [
-        'user:read', 'user:write', 'user:delete',
-        'role:read', 'role:write', 'role:delete',
-        'department:read', 'department:write', 'department:delete',
-        'app:read', 'app:write', 'app:delete',
-        'tenant:read', 'tenant:write',
+        'user:read',
+        'user:write',
+        'user:delete',
+        'role:read',
+        'role:write',
+        'role:delete',
+        'department:read',
+        'department:write',
+        'department:delete',
+        'app:read',
+        'app:write',
+        'app:delete',
+        'tenant:read',
+        'tenant:write',
         'audit:read',
-        'settings:read', 'settings:write',
+        'settings:read',
+        'settings:write',
         '*',
       ];
 
       // 普通用户权限：只读
-      const USER_PERMISSIONS = ['user:read', 'role:read', 'department:read', 'app:read'];
-      
+      const USER_PERMISSIONS = [
+        'user:read',
+        'role:read',
+        'department:read',
+        'app:read',
+      ];
+
       // 部门经理权限：读写部门 + 只读其他
       const MANAGER_PERMISSIONS = [
-        'user:read', 'user:write',
+        'user:read',
+        'user:write',
         'role:read',
-        'department:read', 'department:write',
+        'department:read',
+        'department:write',
         'app:read',
         'audit:read',
       ];
@@ -302,12 +346,14 @@ export class InitController {
           username: result.user.username,
           email: result.user.email,
         },
-        app: result.app ? {
-          id: result.app.id,
-          name: result.app.name,
-          clientId: result.app.client_id,
-          clientSecret: result.clientSecret,
-        } : null,
+        app: result.app
+          ? {
+              id: result.app.id,
+              name: result.app.name,
+              clientId: result.app.client_id,
+              clientSecret: result.clientSecret,
+            }
+          : null,
         token: {
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,

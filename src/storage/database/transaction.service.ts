@@ -113,7 +113,7 @@ export class TransactionService {
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1小时后过期
 
       console.log('DEBUG: 尝试创建 session，user_id:', newUser.id);
-      
+
       const { data: sessionData, error: sessionError } = await this.client
         .from('user_sessions')
         .insert({
@@ -127,18 +127,25 @@ export class TransactionService {
         .select()
         .single();
 
-      console.log('DEBUG: session 插入结果 - data:', sessionData, 'error:', sessionError);
+      console.log(
+        'DEBUG: session 插入结果 - data:',
+        sessionData,
+        'error:',
+        sessionError,
+      );
 
       if (sessionError) {
         console.warn('⚠️ 创建 session 失败:', JSON.stringify(sessionError));
       } else {
         results.accessToken = accessToken;
         results.refreshToken = refreshToken;
-        console.log('✅ Session 创建成功, token:', accessToken.substring(0, 10) + '...');
+        console.log(
+          '✅ Session 创建成功, token:',
+          accessToken.substring(0, 10) + '...',
+        );
       }
 
       return results;
-
     } catch (error: any) {
       console.error('❌ 初始化租户失败:', error.message);
       // 确保清理所有已创建的资源
@@ -168,7 +175,7 @@ export class TransactionService {
    */
   private async cleanupPartialData(results: any): Promise<void> {
     console.log('🧹 开始清理部分数据...');
-    
+
     if (results.app?.client_id) {
       try {
         await secretStorage.deleteClientSecret(results.app.client_id);
@@ -185,7 +192,7 @@ export class TransactionService {
     if (results.tenant?.id) {
       await this.rollback('tenants', results.tenant.id);
     }
-    
+
     console.log('🧹 清理完成');
   }
 
@@ -193,12 +200,30 @@ export class TransactionService {
    * 清理指定表的数据
    */
   async clearAll(): Promise<void> {
-    await this.client.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await this.client.from('user_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await this.client.from('user_authorizations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await this.client.from('oauth_clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await this.client.from('users').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await this.client.from('tenants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await this.client
+      .from('audit_logs')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    await this.client
+      .from('user_sessions')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    await this.client
+      .from('user_authorizations')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    await this.client
+      .from('oauth_clients')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    await this.client
+      .from('users')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    await this.client
+      .from('tenants')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
   }
 }
 

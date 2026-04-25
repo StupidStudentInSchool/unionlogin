@@ -1,11 +1,15 @@
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { oauthClientService, auditService } from '../../storage/database/services';
+import {
+  oauthClientService,
+  auditService,
+} from '../../storage/database/services';
 import { getSupabaseClient } from '../../storage/database/supabase-client';
 import type { OAuthClient } from '../../storage/database/shared/schema';
 
 // 加密密钥（生产环境应从环境变量获取）
-const ENCRYPTION_KEY = process.env.SECRET_ENCRYPTION_KEY || 'idc-default-encryption-key-32b!';
+const ENCRYPTION_KEY =
+  process.env.SECRET_ENCRYPTION_KEY || 'idc-default-encryption-key-32b!';
 
 // 加密函数
 function encrypt(text: string): string {
@@ -45,7 +49,7 @@ export class AppsService {
     const clientId = crypto.randomBytes(16).toString('hex');
     const clientSecret = crypto.randomBytes(32).toString('hex');
     const hashedSecret = await bcrypt.hash(clientSecret, 12);
-    
+
     // 加密明文密钥用于存储
     const encryptedSecret = encrypt(clientSecret);
 
@@ -81,7 +85,11 @@ export class AppsService {
   }
 
   // 验证客户端
-  async validateClient(clientId: string, clientSecret: string, redirectUri: string): Promise<OAuthClient> {
+  async validateClient(
+    clientId: string,
+    clientSecret: string,
+    redirectUri: string,
+  ): Promise<OAuthClient> {
     const app = await oauthClientService.findByClientId(clientId);
     if (!app) {
       throw new Error('客户端不存在');
@@ -91,7 +99,10 @@ export class AppsService {
       throw new Error('客户端已被禁用');
     }
 
-    if (!Array.isArray(app.redirect_uris) || !app.redirect_uris.includes(redirectUri)) {
+    if (
+      !Array.isArray(app.redirect_uris) ||
+      !app.redirect_uris.includes(redirectUri)
+    ) {
       throw new Error('未授权的回调地址');
     }
 
@@ -105,7 +116,9 @@ export class AppsService {
   }
 
   // 获取应用（管理员）- 包含明文密钥
-  async getAppForAdmin(clientId: string): Promise<{ app: OAuthClient; clientSecret?: string }> {
+  async getAppForAdmin(
+    clientId: string,
+  ): Promise<{ app: OAuthClient; clientSecret?: string }> {
     const app = await oauthClientService.findByClientId(clientId);
     if (!app) {
       throw new Error('应用不存在');
@@ -114,7 +127,7 @@ export class AppsService {
     // 直接使用 app 中的 client_secret_plain 字段（如果存在）
     // 如果没有，尝试解密或返回 undefined
     let clientSecret: string | undefined;
-    
+
     if ((app as any).client_secret_plain) {
       // 尝试解密（如果是加密格式）
       const plain = (app as any).client_secret_plain as string;
@@ -139,12 +152,16 @@ export class AppsService {
   }
 
   // 更新应用
-  async updateApp(clientId: string, data: { name?: string; redirectUris?: string[]; scopes?: string[] }, tenantId?: string): Promise<OAuthClient> {
+  async updateApp(
+    clientId: string,
+    data: { name?: string; redirectUris?: string[]; scopes?: string[] },
+    tenantId?: string,
+  ): Promise<OAuthClient> {
     const updateData: any = {};
     if (data.name) updateData.name = data.name;
     if (data.redirectUris) updateData.redirect_uris = data.redirectUris;
     if (data.scopes) updateData.scopes = data.scopes;
-    
+
     return oauthClientService.update(clientId, updateData, tenantId);
   }
 

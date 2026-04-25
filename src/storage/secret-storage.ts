@@ -36,7 +36,7 @@ export class SecretStorageService {
     try {
       const exists = await storage.fileExists({ fileKey: key });
       if (!exists) return null;
-      
+
       const buffer = await storage.readFile({ fileKey: key });
       return buffer.toString('utf-8');
     } catch {

@@ -1,7 +1,20 @@
 import { Module, Global } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule as NestConfigModule, ConfigService } from '@nestjs/config';
-import { databaseConfig, redisConfig, jwtConfig, oauthConfig, appConfig, tenantConfig, githubConfig, googleConfig, wechatConfig } from './configuration';
+import {
+  ConfigModule as NestConfigModule,
+  ConfigService,
+} from '@nestjs/config';
+import {
+  databaseConfig,
+  redisConfig,
+  jwtConfig,
+  oauthConfig,
+  appConfig,
+  tenantConfig,
+  githubConfig,
+  googleConfig,
+  wechatConfig,
+} from './configuration';
 import { RedisService } from './redis.service';
 
 @Global()

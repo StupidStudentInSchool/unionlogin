@@ -29,8 +29,10 @@ async function init() {
 
     // 创建默认租户
     const tenantRepo = dataSource.getRepository(Tenant);
-    let defaultTenant = await tenantRepo.findOne({ where: { slug: 'default' } });
-    
+    let defaultTenant = await tenantRepo.findOne({
+      where: { slug: 'default' },
+    });
+
     if (!defaultTenant) {
       defaultTenant = tenantRepo.create({
         name: 'Default Tenant',
@@ -48,7 +50,7 @@ async function init() {
     // 创建管理员用户
     const userRepo = dataSource.getRepository(User);
     let adminUser = await userRepo.findOne({ where: { username: 'admin' } });
-    
+
     if (!adminUser) {
       const passwordHash = await bcrypt.hash('admin123', 12);
       adminUser = userRepo.create({
@@ -66,31 +68,38 @@ async function init() {
 
     // 创建示例应用
     const clientRepo = dataSource.getRepository(OAuthClient);
-    let exampleApp = await clientRepo.findOne({ where: { name: 'Example App' } });
-    
+    let exampleApp = await clientRepo.findOne({
+      where: { name: 'Example App' },
+    });
+
     if (!exampleApp) {
       const clientId = 'example_app';
       const clientSecret = await bcrypt.hash('example_secret', 12);
-      
+
       exampleApp = clientRepo.create({
         clientId,
         clientSecret,
         name: 'Example App',
         description: 'Example application for testing',
-        redirectUris: ['http://localhost:3000/callback', 'http://localhost:8080/callback'],
+        redirectUris: [
+          'http://localhost:3000/callback',
+          'http://localhost:8080/callback',
+        ],
         allowedScopes: ['openid', 'profile', 'email'],
         status: ClientStatus.ACTIVE,
         tenantId: defaultTenant.id,
       });
       await clientRepo.save(exampleApp);
-      console.log('Example app created (client_id: example_app, client_secret: example_secret)');
+      console.log(
+        'Example app created (client_id: example_app, client_secret: example_secret)',
+      );
     }
 
     console.log('\nInitialization completed!');
     console.log('\nYou can login with:');
     console.log('  Username: admin');
     console.log('  Password: admin123');
-    
+
     await dataSource.destroy();
   } catch (error) {
     console.error('Initialization failed:', error);

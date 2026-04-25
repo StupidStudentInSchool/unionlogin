@@ -1,4 +1,8 @@
-import { createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
+import {
+  createParamDecorator,
+  ExecutionContext,
+  SetMetadata,
+} from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 
 export const CurrentUser = createParamDecorator(
@@ -26,4 +30,8 @@ export const ROLES_KEY = 'roles';
 export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 
 export const ApiTenantQuery = () =>
-  ApiQuery({ name: 'tenantId', required: false, description: '租户ID（多租户模式下必填）' });
+  ApiQuery({
+    name: 'tenantId',
+    required: false,
+    description: '租户ID（多租户模式下必填）',
+  });

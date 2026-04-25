@@ -1,5 +1,9 @@
 import axios from 'axios';
-import { thirdPartyService, userService, auditService } from '../../storage/database/services';
+import {
+  thirdPartyService,
+  userService,
+  auditService,
+} from '../../storage/database/services';
 
 interface ThirdPartyUserInfo {
   provider: string;
@@ -40,7 +44,7 @@ export class ThirdPartyService {
   getGithubAuthUrl(state: string): string {
     const { clientId, authUrl, scope } = this.config.github;
     if (!clientId) throw new Error('GitHub OAuth 未配置');
-    
+
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: `${process.env.APP_URL}/auth/github/callback`,
@@ -53,7 +57,7 @@ export class ThirdPartyService {
   getGoogleAuthUrl(state: string): string {
     const { clientId, authUrl, scope } = this.config.google;
     if (!clientId) throw new Error('Google OAuth 未配置');
-    
+
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: `${process.env.APP_URL}/auth/google/callback`,
@@ -69,7 +73,7 @@ export class ThirdPartyService {
   getWechatAuthUrl(state: string): string {
     const { appId, authUrl, scope } = this.config.wechat;
     if (!appId) throw new Error('微信 OAuth 未配置');
-    
+
     const params = new URLSearchParams({
       appid: appId,
       redirect_uri: `${process.env.APP_URL}/auth/wechat/callback`,
@@ -98,16 +102,24 @@ export class ThirdPartyService {
     }
   }
 
-  private async handleGithubCallback(code: string, ipAddress: string, userAgent?: string): Promise<ThirdPartyUserInfo> {
+  private async handleGithubCallback(
+    code: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<ThirdPartyUserInfo> {
     const { clientId, clientSecret, tokenUrl, userUrl } = this.config.github;
     if (!clientId || !clientSecret) throw new Error('GitHub OAuth 未配置');
 
     // 获取 access_token
-    const tokenResponse = await axios.post(tokenUrl, {
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-    }, { headers: { Accept: 'application/json' } });
+    const tokenResponse = await axios.post(
+      tokenUrl,
+      {
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+      },
+      { headers: { Accept: 'application/json' } },
+    );
 
     const accessToken = tokenResponse.data.access_token;
 
@@ -133,7 +145,11 @@ export class ThirdPartyService {
     };
   }
 
-  private async handleGoogleCallback(code: string, ipAddress: string, userAgent?: string): Promise<ThirdPartyUserInfo> {
+  private async handleGoogleCallback(
+    code: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<ThirdPartyUserInfo> {
     const { clientId, clientSecret, tokenUrl, userUrl } = this.config.google;
     if (!clientId || !clientSecret) throw new Error('Google OAuth 未配置');
 
@@ -170,7 +186,11 @@ export class ThirdPartyService {
     };
   }
 
-  private async handleWechatCallback(code: string, ipAddress: string, userAgent?: string): Promise<ThirdPartyUserInfo> {
+  private async handleWechatCallback(
+    code: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<ThirdPartyUserInfo> {
     const { appId, appSecret, tokenUrl, userUrl } = this.config.wechat;
     if (!appId || !appSecret) throw new Error('微信 OAuth 未配置');
 

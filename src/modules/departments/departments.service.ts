@@ -56,7 +56,10 @@ export class DepartmentsService {
   /**
    * 创建部门
    */
-  async create(tenantId: string, dto: CreateDepartmentDto): Promise<Department> {
+  async create(
+    tenantId: string,
+    dto: CreateDepartmentDto,
+  ): Promise<Department> {
     // 计算层级
     let level = 1;
     if (dto.parentId) {
@@ -87,7 +90,11 @@ export class DepartmentsService {
   /**
    * 更新部门
    */
-  async update(id: string, tenantId: string, dto: UpdateDepartmentDto): Promise<Department> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateDepartmentDto,
+  ): Promise<Department> {
     // 如果更改了父部门，需要重新计算层级
     let level: number | undefined;
     if (dto.parentId !== undefined) {
@@ -104,7 +111,7 @@ export class DepartmentsService {
     const updateData: any = {
       updated_at: new Date().toISOString(),
     };
-    
+
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.code !== undefined) updateData.code = dto.code;
     if (dto.parentId !== undefined) updateData.parent_id = dto.parentId || null;

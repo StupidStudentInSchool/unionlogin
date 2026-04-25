@@ -30,19 +30,20 @@ export class AuthController {
     @Req() req: Request,
   ) {
     const authHeader = req.headers.authorization;
-    
+
     if (authHeader) {
       const [type, token] = authHeader.split(' ');
       if (type === 'Bearer' && token) {
         try {
           const introspection = await authService.introspectToken(token);
           if (introspection.active && introspection.sub) {
-            const { code, state: newState } = await authService.generateAuthorizationCode(
-              clientId,
-              redirectUri,
-              introspection.sub,
-              scope?.split(' ') || ['openid', 'profile', 'email'],
-            );
+            const { code, state: newState } =
+              await authService.generateAuthorizationCode(
+                clientId,
+                redirectUri,
+                introspection.sub,
+                scope?.split(' ') || ['openid', 'profile', 'email'],
+              );
 
             return {
               requireLogin: false,
@@ -66,7 +67,8 @@ export class AuthController {
   @ApiOperation({ summary: '换取 Access Token' })
   @ApiResponse({ status: 200, description: 'Token 响应' })
   async getToken(
-    @Body() body: {
+    @Body()
+    body: {
       grant_type: string;
       client_id?: string;
       client_secret?: string;
@@ -119,7 +121,12 @@ export class AuthController {
     @Req() req: Request,
   ) {
     const ipAddress = (req.headers['x-forwarded-for'] as string) || '';
-    await authService.logout(accessToken, userId, ipAddress, req.headers['user-agent']);
+    await authService.logout(
+      accessToken,
+      userId,
+      ipAddress,
+      req.headers['user-agent'],
+    );
     return { success: true };
   }
 
@@ -127,11 +134,22 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'OAuth 登录（简化版）' })
   async oauthLogin(
-    @Body() body: { clientId: string; clientSecret: string; username: string; password: string; redirectUri: string },
+    @Body()
+    body: {
+      clientId: string;
+      clientSecret: string;
+      username: string;
+      password: string;
+      redirectUri: string;
+    },
     @Req() req: Request,
   ) {
     // 验证客户端
-    await appsService.validateClient(body.clientId, body.clientSecret, body.redirectUri);
+    await appsService.validateClient(
+      body.clientId,
+      body.clientSecret,
+      body.redirectUri,
+    );
 
     // 用户登录
     const { user } = await usersService.login(
@@ -149,6 +167,10 @@ export class AuthController {
     );
 
     // 换取 Token
-    return authService.exchangeCodeForToken(code, body.clientId, body.redirectUri);
+    return authService.exchangeCodeForToken(
+      code,
+      body.clientId,
+      body.redirectUri,
+    );
   }
 }

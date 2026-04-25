@@ -76,7 +76,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Token 相关操作
-  async setAccessToken(token: string, userId: string, expireSeconds: number): Promise<void> {
+  async setAccessToken(
+    token: string,
+    userId: string,
+    expireSeconds: number,
+  ): Promise<void> {
     await this.set(`access_token:${token}`, userId, expireSeconds);
     await this.client.sadd(`user_tokens:${userId}`, token);
   }
@@ -93,7 +97,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async setRefreshToken(token: string, userId: string, expireSeconds: number): Promise<void> {
+  async setRefreshToken(
+    token: string,
+    userId: string,
+    expireSeconds: number,
+  ): Promise<void> {
     await this.set(`refresh_token:${token}`, userId, expireSeconds);
   }
 
@@ -106,11 +114,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   // 授权码操作
-  async setAuthorizationCode(code: string, data: Record<string, any>, expireSeconds: number): Promise<void> {
+  async setAuthorizationCode(
+    code: string,
+    data: Record<string, any>,
+    expireSeconds: number,
+  ): Promise<void> {
     await this.set(`auth_code:${code}`, JSON.stringify(data), expireSeconds);
   }
 
-  async getAuthorizationCode(code: string): Promise<Record<string, any> | null> {
+  async getAuthorizationCode(
+    code: string,
+  ): Promise<Record<string, any> | null> {
     const data = await this.get(`auth_code:${code}`);
     return data ? JSON.parse(data) : null;
   }
@@ -120,7 +134,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   // 会话操作
-  async setSession(sessionId: string, data: Record<string, any>, expireSeconds: number): Promise<void> {
+  async setSession(
+    sessionId: string,
+    data: Record<string, any>,
+    expireSeconds: number,
+  ): Promise<void> {
     await this.set(`session:${sessionId}`, JSON.stringify(data), expireSeconds);
   }
 
@@ -134,15 +152,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   // 用户会话管理（支持强制登出）
-  async addUserSession(userId: string, sessionId: string, deviceInfo: string, expireSeconds: number): Promise<void> {
+  async addUserSession(
+    userId: string,
+    sessionId: string,
+    deviceInfo: string,
+    expireSeconds: number,
+  ): Promise<void> {
     await this.client.sadd(`user_sessions:${userId}`, sessionId);
-    await this.set(`session_info:${sessionId}`, JSON.stringify({ userId, deviceInfo }), expireSeconds);
+    await this.set(
+      `session_info:${sessionId}`,
+      JSON.stringify({ userId, deviceInfo }),
+      expireSeconds,
+    );
   }
 
-  async getUserSessions(userId: string): Promise<Array<{ sessionId: string; deviceInfo: string }>> {
+  async getUserSessions(
+    userId: string,
+  ): Promise<Array<{ sessionId: string; deviceInfo: string }>> {
     const sessionIds = await this.client.smembers(`user_sessions:${userId}`);
     const sessions: Array<{ sessionId: string; deviceInfo: string }> = [];
-    
+
     for (const sessionId of sessionIds) {
       const info = await this.getSession(sessionId);
       if (info) {
@@ -152,7 +181,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         await this.client.srem(`user_sessions:${userId}`, sessionId);
       }
     }
-    
+
     return sessions;
   }
 

@@ -1,9 +1,17 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Tenant, TenantStatus } from '../../database/entities/tenant.entity';
-import { CreateTenantDto, UpdateTenantDto, TenantResponseDto } from './dto/tenant.dto';
+import {
+  CreateTenantDto,
+  UpdateTenantDto,
+  TenantResponseDto,
+} from './dto/tenant.dto';
 
 @Injectable()
 export class TenantService {
@@ -14,7 +22,9 @@ export class TenantService {
 
   async create(dto: CreateTenantDto): Promise<TenantResponseDto> {
     // 检查 slug 是否已存在
-    const existing = await this.tenantRepository.findOne({ where: { slug: dto.slug } });
+    const existing = await this.tenantRepository.findOne({
+      where: { slug: dto.slug },
+    });
     if (existing) {
       throw new ConflictException('租户 slug 已存在');
     }
@@ -27,7 +37,11 @@ export class TenantService {
       logoUrl: dto.logoUrl,
       maxUsers: dto.maxUsers || 100,
       maxApps: dto.maxApps || 10,
-      allowedThirdParty: dto.allowedThirdParty || ['github', 'google', 'wechat'],
+      allowedThirdParty: dto.allowedThirdParty || [
+        'github',
+        'google',
+        'wechat',
+      ],
     });
 
     await this.tenantRepository.save(tenant);
@@ -65,7 +79,8 @@ export class TenantService {
     if (dto.logoUrl !== undefined) tenant.logoUrl = dto.logoUrl;
     if (dto.maxUsers !== undefined) tenant.maxUsers = dto.maxUsers;
     if (dto.maxApps !== undefined) tenant.maxApps = dto.maxApps;
-    if (dto.allowedThirdParty !== undefined) tenant.allowedThirdParty = dto.allowedThirdParty;
+    if (dto.allowedThirdParty !== undefined)
+      tenant.allowedThirdParty = dto.allowedThirdParty;
     if (dto.status !== undefined) tenant.status = dto.status;
 
     await this.tenantRepository.save(tenant);
@@ -77,8 +92,13 @@ export class TenantService {
     await this.tenantRepository.remove(tenant);
   }
 
-  async isThirdPartyAllowed(tenantId: string, provider: string): Promise<boolean> {
-    const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
+  async isThirdPartyAllowed(
+    tenantId: string,
+    provider: string,
+  ): Promise<boolean> {
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: tenantId },
+    });
     if (!tenant) {
       return true; // 默认允许
     }

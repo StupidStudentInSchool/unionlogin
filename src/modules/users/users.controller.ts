@@ -22,7 +22,13 @@ export class UsersController {
   @Post('register')
   @ApiOperation({ summary: '用户注册' })
   async register(
-    @Body() body: { username: string; email: string; password: string; nickname?: string },
+    @Body()
+    body: {
+      username: string;
+      email: string;
+      password: string;
+      nickname?: string;
+    },
     @Req() req: Request,
   ) {
     const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
@@ -42,7 +48,12 @@ export class UsersController {
       login: body.login || body.email || '',
       password: body.password,
     };
-    return usersService.login(loginData, ipAddress, req.headers['user-agent'], tenantId);
+    return usersService.login(
+      loginData,
+      ipAddress,
+      req.headers['user-agent'],
+      tenantId,
+    );
   }
 
   @UseGuards(AuthGuard)
@@ -69,7 +80,11 @@ export class UsersController {
     @CurrentUser('userId') userId: string,
     @Body() body: { oldPassword: string; newPassword: string },
   ) {
-    await usersService.changePassword(userId, body.oldPassword, body.newPassword);
+    await usersService.changePassword(
+      userId,
+      body.oldPassword,
+      body.newPassword,
+    );
     return { success: true };
   }
 

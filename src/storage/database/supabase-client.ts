@@ -10,7 +10,11 @@ interface SupabaseCredentials {
 }
 
 function loadEnv(): void {
-  if (envLoaded && process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY) {
+  if (
+    envLoaded &&
+    process.env.COZE_SUPABASE_URL &&
+    process.env.COZE_SUPABASE_ANON_KEY
+  ) {
     return;
   }
 
@@ -39,11 +43,14 @@ except Exception as e:
     print(f"# Error: {e}", file=sys.stderr)
 `;
 
-    const output = execSync(`python3 -c '${pythonCode.replace(/'/g, "'\"'\"'")}'`, {
-      encoding: 'utf-8',
-      timeout: 10000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const output = execSync(
+      `python3 -c '${pythonCode.replace(/'/g, "'\"'\"'")}'`,
+      {
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
 
     const lines = output.trim().split('\n');
     for (const line of lines) {
@@ -52,8 +59,10 @@ except Exception as e:
       if (eqIndex > 0) {
         const key = line.substring(0, eqIndex);
         let value = line.substring(eqIndex + 1);
-        if ((value.startsWith("'") && value.endsWith("'")) ||
-            (value.startsWith('"') && value.endsWith('"'))) {
+        if (
+          (value.startsWith("'") && value.endsWith("'")) ||
+          (value.startsWith('"') && value.endsWith('"'))
+        ) {
           value = value.slice(1, -1);
         }
         if (!process.env[key]) {
@@ -84,9 +93,9 @@ let _client: SupabaseClient | null = null;
 
 function getSupabaseClient(): SupabaseClient {
   if (_client) return _client;
-  
+
   const { url, anonKey, serviceRoleKey } = getSupabaseCredentials();
-  
+
   _client = createClient(url, serviceRoleKey || anonKey, {
     auth: {
       autoRefreshToken: false,
@@ -96,14 +105,14 @@ function getSupabaseClient(): SupabaseClient {
       schema: 'public',
     },
   });
-  
+
   return _client;
 }
 
 // 为新表创建专门的客户端（绕过 schema 缓存）
 function createNewClient(): SupabaseClient {
   const { url, anonKey, serviceRoleKey } = getSupabaseCredentials();
-  
+
   return createClient(url, serviceRoleKey || anonKey, {
     auth: {
       autoRefreshToken: false,

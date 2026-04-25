@@ -35,7 +35,11 @@ export class OAuthClient {
   @Column({ name: 'redirect_uris', type: 'json' })
   redirectUris: string[];
 
-  @Column({ name: 'allowed_scopes', type: 'json', default: ['openid', 'profile', 'email'] })
+  @Column({
+    name: 'allowed_scopes',
+    type: 'json',
+    default: ['openid', 'profile', 'email'],
+  })
   allowedScopes: string[];
 
   @Column({ name: 'logo_url', length: 500, nullable: true })

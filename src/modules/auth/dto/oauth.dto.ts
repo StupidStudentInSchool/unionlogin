@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsArray, IsOptional, IsEnum, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsOptional,
+  IsEnum,
+  IsNotEmpty,
+} from 'class-validator';
 
 export class AuthorizeDto {
   @ApiProperty({ description: '客户端ID' })

@@ -25,9 +25,10 @@ export class AppsController {
     @Body() body: { name: string; redirectUris: string[]; scopes?: string[] },
     @Req() req: Request,
   ) {
-    const tenantId = (req as any).tenantId || (req.headers['x-tenant-id'] as string);
+    const tenantId =
+      (req as any).tenantId || (req.headers['x-tenant-id'] as string);
     const result = await appsService.createApp({ ...body, tenantId });
-    
+
     return {
       app: {
         id: result.app.id,
@@ -64,7 +65,8 @@ export class AppsController {
     @Body() body: { name?: string; redirectUris?: string[]; scopes?: string[] },
     @Req() req: Request,
   ) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).tenantId;
+    const tenantId =
+      (req.headers['x-tenant-id'] as string) || (req as any).tenantId;
     const result = await appsService.updateApp(clientId, body, tenantId);
     return { success: true, data: result };
   }
@@ -72,7 +74,8 @@ export class AppsController {
   @Delete(':clientId')
   @ApiOperation({ summary: '删除应用' })
   async deleteApp(@Param('clientId') clientId: string, @Req() req: Request) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).tenantId;
+    const tenantId =
+      (req.headers['x-tenant-id'] as string) || (req as any).tenantId;
     await appsService.deleteApp(clientId, tenantId);
     return { success: true, message: '删除成功' };
   }

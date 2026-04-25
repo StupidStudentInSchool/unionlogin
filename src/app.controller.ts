@@ -31,8 +31,8 @@ export class ApiController {
   @Get('health')
   @ApiOperation({ summary: '健康检查' })
   health() {
-    return { 
-      status: 'ok', 
+    return {
+      status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
     };

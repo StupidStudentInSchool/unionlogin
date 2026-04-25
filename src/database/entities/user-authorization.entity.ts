@@ -40,7 +40,9 @@ export class UserAuthorization {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => OAuthClient, (client) => client.authorizations, { onDelete: 'CASCADE' })
+  @ManyToOne(() => OAuthClient, (client) => client.authorizations, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'client_id' })
   client: OAuthClient;
 

@@ -1,4 +1,10 @@
-import { userService, auditService, thirdPartyService, roleService, departmentService } from '../../storage/database/services';
+import {
+  userService,
+  auditService,
+  thirdPartyService,
+  roleService,
+  departmentService,
+} from '../../storage/database/services';
 import { getSupabaseClient } from '../../storage/database/supabase-client';
 import type { User, InsertUser } from '../../storage/database/shared/schema';
 import * as crypto from 'crypto';
@@ -58,10 +64,15 @@ export class UsersService {
   }
 
   // 用户登录
-  async login(data: {
-    login: string;
-    password: string;
-  }, ipAddress?: string, userAgent?: string, tenantId?: string): Promise<{ user: User; accessToken?: string; refreshToken?: string }> {
+  async login(
+    data: {
+      login: string;
+      password: string;
+    },
+    ipAddress?: string,
+    userAgent?: string,
+    tenantId?: string,
+  ): Promise<{ user: User; accessToken?: string; refreshToken?: string }> {
     // 支持用户名或邮箱登录（按租户过滤）
     let user = await userService.findByUsername(data.login, tenantId);
     if (!user) {
@@ -73,7 +84,12 @@ export class UsersService {
       throw new Error('用户名或密码错误');
     }
 
-    console.log('[Login] 用户找到:', user.username, 'hasHash:', !!user.password_hash);
+    console.log(
+      '[Login] 用户找到:',
+      user.username,
+      'hasHash:',
+      !!user.password_hash,
+    );
     // 验证密码
     const isValid = await userService.verifyPassword(user, data.password);
     console.log('[Login] 密码验证结果:', isValid);
@@ -94,29 +110,35 @@ export class UsersService {
     const expiresAt = new Date(Date.now() + 3600 * 1000); // 1小时后过期
 
     const client = getSupabaseClient();
-    
+
     // 处理 IP 地址：只取第一个，并截断到 45 字符
     let safeIpAddress = ipAddress || '';
     if (safeIpAddress.includes(',')) {
       safeIpAddress = safeIpAddress.split(',')[0].trim();
     }
     safeIpAddress = safeIpAddress.substring(0, 45);
-    
+
     // 处理 User Agent：截断到合适长度
     const safeUserAgent = (userAgent || '').substring(0, 500);
-    
+
     // 插入 session 并检查是否成功
-    const { data: sessionData, error: sessionError } = await client.from('user_sessions').insert({
-      user_id: user.id,
-      token_hash: accessToken,
-      refresh_token_hash: refreshToken,
-      ip_address: safeIpAddress,
-      user_agent: safeUserAgent,
-      expires_at: expiresAt.toISOString(),
-    }).select();
+    const { data: sessionData, error: sessionError } = await client
+      .from('user_sessions')
+      .insert({
+        user_id: user.id,
+        token_hash: accessToken,
+        refresh_token_hash: refreshToken,
+        ip_address: safeIpAddress,
+        user_agent: safeUserAgent,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select();
 
     if (sessionError) {
-      console.error('[Login] Session 创建失败:', JSON.stringify(sessionError, null, 2));
+      console.error(
+        '[Login] Session 创建失败:',
+        JSON.stringify(sessionError, null, 2),
+      );
       console.error('[Login] 尝试插入的数据:', {
         user_id: user.id,
         token_hash_length: accessToken.length,
@@ -125,14 +147,16 @@ export class UsersService {
       });
       throw new Error('登录失败：无法创建会话 - ' + sessionError.message);
     }
-    
+
     console.log('[Login] Session 创建成功:', sessionData?.[0]?.id || 'unknown');
 
     // 获取用户角色和部门信息
     const roles = await roleService.getUserRoleCodes(user.id);
     let department: UserWithDetails['department'] = null;
     if ((user as any).department_id) {
-      const dept = await departmentService.findById((user as any).department_id);
+      const dept = await departmentService.findById(
+        (user as any).department_id,
+      );
       if (dept) {
         const path = await departmentService.getDepartmentPath(dept.id);
         department = {
@@ -153,7 +177,7 @@ export class UsersService {
           .from('roles')
           .select('code, permissions')
           .in('id', roleIds);
-        
+
         if (roleData) {
           const allPermissions = new Set<string>();
           for (const role of roleData) {
@@ -207,7 +231,9 @@ export class UsersService {
     // 获取用户部门
     let department: UserWithDetails['department'] = null;
     if ((user as any).department_id) {
-      const dept = await departmentService.findById((user as any).department_id);
+      const dept = await departmentService.findById(
+        (user as any).department_id,
+      );
       if (dept) {
         const path = await departmentService.getDepartmentPath(dept.id);
         department = {
@@ -232,9 +258,12 @@ export class UsersService {
   }
 
   // 更新用户信息
-  async updateProfile(userId: string, data: { nickname?: string; avatar?: string; phone?: string }): Promise<User> {
+  async updateProfile(
+    userId: string,
+    data: { nickname?: string; avatar?: string; phone?: string },
+  ): Promise<User> {
     const user = await userService.update(userId, data);
-    
+
     await auditService.create({
       event_type: 'profile_update',
       user_id: userId,
@@ -244,7 +273,11 @@ export class UsersService {
   }
 
   // 修改密码
-  async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<void> {
     const user = await userService.findById(userId);
     if (!user) {
       throw new Error('用户不存在');
@@ -275,7 +308,10 @@ export class UsersService {
     avatar?: string,
   ): Promise<User> {
     // 查找已绑定的第三方账户
-    let thirdPartyAccount = await thirdPartyService.findByProvider(provider, providerUserId);
+    const thirdPartyAccount = await thirdPartyService.findByProvider(
+      provider,
+      providerUserId,
+    );
 
     if (thirdPartyAccount) {
       // 已存在，返回关联的用户
@@ -316,10 +352,18 @@ export class UsersService {
   }
 
   // 获取所有用户（管理后台）
-  async getUsers(tenantId?: string, page = 1, pageSize = 20): Promise<{ list: any[]; total: number }> {
+  async getUsers(
+    tenantId?: string,
+    page = 1,
+    pageSize = 20,
+  ): Promise<{ list: any[]; total: number }> {
     const client = getSupabaseClient();
-    let query = client.from('users').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * pageSize, page * pageSize - 1);
-    
+    let query = client
+      .from('users')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
+
     // 只有当 tenantId 有效（不是 'default' 且不是 undefined）时才过滤
     if (tenantId && tenantId !== 'default') {
       query = query.eq('tenant_id', tenantId);
@@ -327,66 +371,71 @@ export class UsersService {
 
     const { data, error, count } = await query;
     if (error) throw new Error(`查询用户失败: ${error.message}`);
-    
+
     // 获取所有用户的角色 ID 和部门 ID
-    const users = (data || []) as any[];
+    const users = data || [];
     const allRoleIds: string[] = [];
     const allDeptIds: string[] = [];
-    users.forEach(u => {
+    users.forEach((u) => {
       const roleIds = u.metadata?.roles || [];
       allRoleIds.push(...roleIds);
       if (u.department_id) {
         allDeptIds.push(u.department_id);
       }
     });
-    
+
     // 查询角色信息
-    let roleMap: Record<string, { name: string; code: string }> = {};
+    const roleMap: Record<string, { name: string; code: string }> = {};
     if (allRoleIds.length > 0) {
       const { data: roles } = await client
         .from('roles')
         .select('id, name, code')
         .in('id', [...new Set(allRoleIds)]);
-      
+
       if (roles) {
-        roles.forEach(r => {
+        roles.forEach((r) => {
           roleMap[r.id] = { name: r.name, code: r.code };
         });
       }
     }
-    
+
     // 查询部门信息
-    let deptMap: Record<string, string> = {};
+    const deptMap: Record<string, string> = {};
     if (allDeptIds.length > 0) {
       const { data: depts } = await client
         .from('departments')
         .select('id, name')
         .in('id', [...new Set(allDeptIds)]);
-      
+
       if (depts) {
-        depts.forEach(d => {
+        depts.forEach((d) => {
           deptMap[d.id] = d.name;
         });
       }
     }
-    
+
     // 组装返回数据，包含角色名称和部门名称
-    const usersWithRoles = users.map(u => {
+    const usersWithRoles = users.map((u) => {
       const roleIds = u.metadata?.roles || [];
       const roles = roleIds.map((id: string) => roleMap[id]).filter(Boolean);
       return {
         ...u,
         roles,
         roleNames: roles.map((r: any) => r.name).join(', '),
-        department_name: u.department_id ? deptMap[u.department_id] || null : null,
+        department_name: u.department_id
+          ? deptMap[u.department_id] || null
+          : null,
       };
     });
-    
+
     return { list: usersWithRoles, total: count || 0 };
   }
 
   // 分配用户部门
-  async assignDepartment(userId: string, departmentId: string | null): Promise<void> {
+  async assignDepartment(
+    userId: string,
+    departmentId: string | null,
+  ): Promise<void> {
     const user = await userService.findById(userId);
     if (!user) {
       throw new Error('用户不存在');
@@ -401,7 +450,7 @@ export class UsersService {
     }
 
     // 更新用户的部门
-    await userService.update(userId, { department_id: departmentId } as any);
+    await userService.update(userId, { department_id: departmentId });
 
     await auditService.create({
       event_type: 'department_assign',
@@ -411,12 +460,14 @@ export class UsersService {
   }
 
   // 获取统计数据
-  async getStats(tenantId?: string): Promise<{ activeSessions: number; todayActive: number }> {
+  async getStats(
+    tenantId?: string,
+  ): Promise<{ activeSessions: number; todayActive: number }> {
     const client = getSupabaseClient();
 
     // 活跃会话数：未过期的会话
     const now = new Date().toISOString();
-    let sessionQuery = client
+    const sessionQuery = client
       .from('user_sessions')
       .select('id', { count: 'exact', head: true })
       .gt('expires_at', now);
@@ -426,7 +477,7 @@ export class UsersService {
     todayStart.setHours(0, 0, 0, 0);
     const todayStartStr = todayStart.toISOString();
 
-    let userQuery = client
+    const userQuery = client
       .from('users')
       .select('id', { count: 'exact', head: true })
       .gte('last_login_at', todayStartStr);
@@ -440,7 +491,7 @@ export class UsersService {
         .select('id')
         .eq('tenant_id', tenantId);
 
-      const userIds = (tenantUsers || []).map(u => u.id);
+      const userIds = (tenantUsers || []).map((u) => u.id);
 
       if (userIds.length > 0) {
         // 活跃会话：只统计该租户用户的会话

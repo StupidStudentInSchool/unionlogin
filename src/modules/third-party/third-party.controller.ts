@@ -25,7 +25,7 @@ export class ThirdPartyController {
   githubLogin(@Res() res: Response) {
     const state = crypto.randomBytes(16).toString('hex');
     const authUrl = thirdPartyAuthService.getGithubAuthUrl(state);
-    
+
     res.cookie('oauth_state', state, { httpOnly: true, maxAge: 300000 });
     return res.redirect(authUrl);
   }
@@ -41,7 +41,7 @@ export class ThirdPartyController {
     @Res() res: Response,
   ) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
+
     if (error) {
       return res.redirect(`${frontendUrl}/login?error=${error}`);
     }
@@ -72,7 +72,7 @@ export class ThirdPartyController {
       const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('provider', 'github');
       redirectUrl.searchParams.set('userId', user.id);
-      
+
       return res.redirect(redirectUrl.toString());
     } catch (err) {
       console.error('GitHub callback error:', err);
@@ -86,7 +86,7 @@ export class ThirdPartyController {
   googleLogin(@Res() res: Response) {
     const state = crypto.randomBytes(16).toString('hex');
     const authUrl = thirdPartyAuthService.getGoogleAuthUrl(state);
-    
+
     res.cookie('oauth_state', state, { httpOnly: true, maxAge: 300000 });
     return res.redirect(authUrl);
   }
@@ -102,7 +102,7 @@ export class ThirdPartyController {
     @Res() res: Response,
   ) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
+
     if (error) {
       return res.redirect(`${frontendUrl}/login?error=${error}`);
     }
@@ -133,7 +133,7 @@ export class ThirdPartyController {
       const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('provider', 'google');
       redirectUrl.searchParams.set('userId', user.id);
-      
+
       return res.redirect(redirectUrl.toString());
     } catch (err) {
       console.error('Google callback error:', err);
@@ -147,7 +147,7 @@ export class ThirdPartyController {
   wechatLogin(@Res() res: Response) {
     const state = crypto.randomBytes(16).toString('hex');
     const authUrl = thirdPartyAuthService.getWechatAuthUrl(state);
-    
+
     res.cookie('oauth_state', state, { httpOnly: true, maxAge: 300000 });
     return res.redirect(authUrl);
   }
@@ -163,7 +163,7 @@ export class ThirdPartyController {
     @Res() res: Response,
   ) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
+
     if (error) {
       return res.redirect(`${frontendUrl}/login?error=${error}`);
     }
@@ -194,7 +194,7 @@ export class ThirdPartyController {
       const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set('provider', 'wechat');
       redirectUrl.searchParams.set('userId', user.id);
-      
+
       return res.redirect(redirectUrl.toString());
     } catch (err) {
       console.error('Wechat callback error:', err);
@@ -223,6 +223,6 @@ export class ThirdPartyController {
   }
 
   private getIpAddress(req: Request): string {
-    return req.headers['x-forwarded-for'] as string || '';
+    return (req.headers['x-forwarded-for'] as string) || '';
   }
 }

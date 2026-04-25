@@ -24,19 +24,27 @@ export const SYSTEM_PERMISSIONS = {
   ALL: '*',
 } as const;
 
-export type Permission = typeof SYSTEM_PERMISSIONS[keyof typeof SYSTEM_PERMISSIONS];
+export type Permission =
+  (typeof SYSTEM_PERMISSIONS)[keyof typeof SYSTEM_PERMISSIONS];
 
 export class PermissionService {
   private client = getSupabaseClient();
 
   async getUserPermissions(userId: string): Promise<string[]> {
-    const user = await this.client.from('users').select('metadata').eq('id', userId).single();
+    const user = await this.client
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .single();
     if (!user.data?.metadata?.roles) return [];
 
     const roleIds = user.data.metadata.roles as string[];
     if (!roleIds.length) return [];
 
-    const { data: roles } = await this.client.from('roles').select('code, permissions').in('id', roleIds);
+    const { data: roles } = await this.client
+      .from('roles')
+      .select('code, permissions')
+      .in('id', roleIds);
     if (!roles) return [];
 
     const allPermissions = new Set<string>();
@@ -59,11 +67,18 @@ export class PermissionService {
   }
 
   async isAdmin(userId: string): Promise<boolean> {
-    const user = await this.client.from('users').select('metadata').eq('id', userId).single();
+    const user = await this.client
+      .from('users')
+      .select('metadata')
+      .eq('id', userId)
+      .single();
     if (!user.data?.metadata?.roles) return false;
     const roleIds = user.data.metadata.roles as string[];
-    const { data: roles } = await this.client.from('roles').select('code').in('id', roleIds);
-    return roles?.some(r => r.code === 'admin') ?? false;
+    const { data: roles } = await this.client
+      .from('roles')
+      .select('code')
+      .in('id', roleIds);
+    return roles?.some((r) => r.code === 'admin') ?? false;
   }
 }
 
