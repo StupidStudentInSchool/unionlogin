@@ -1,15 +1,18 @@
-import { pgTable, varchar, timestamp, jsonb, index, text, uuid, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, timestamp, jsonb, text, uuid, integer, boolean, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // 租户表
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 128 }).notNull(),
-  slug: varchar('slug', { length: 64 }).notNull().unique(),
+  slug: varchar('slug', { length: 64 }).notNull(),
   status: varchar('status', { length: 20 }).default('active').notNull(),
+  plan: varchar('plan', { length: 64 }),
   metadata: jsonb('metadata'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }),
-});
+}, (table) => [
+  uniqueIndex('tenants_slug_key').on(table.slug),
+]);
 
 // 部门表
 export const departments = pgTable('departments', {
@@ -25,16 +28,31 @@ export const departments = pgTable('departments', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }),
 }, (table) => [
-  index('departments_tenant_id_idx').on(table.tenant_id),
-  index('departments_parent_id_idx').on(table.parent_id),
+  uniqueIndex('departments_tenant_id_code_key').on(table.tenant_id, table.code),
+]);
+
+// 角色表
+export const roles = pgTable('roles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenant_id: uuid('tenant_id').references(() => tenants.id),
+  name: varchar('name', { length: 128 }).notNull(),
+  code: varchar('code', { length: 64 }).notNull(),
+  level: integer('level').default(0),
+  description: text('description'),
+  is_system: boolean('is_system').default(false),
+  status: varchar('status', { length: 20 }).default('active'),
+  permissions: text('permissions').array(),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('roles_tenant_id_code_key').on(table.tenant_id, table.code),
 ]);
 
 // 用户表
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenant_id: uuid('tenant_id').references(() => tenants.id).notNull(),
-  department_id: uuid('department_id').references(() => departments.id),
-  username: varchar('username', { length: 64 }).notNull().unique(),
+  username: varchar('username', { length: 64 }).notNull(),
   email: varchar('email', { length: 255 }),
   password_hash: varchar('password_hash', { length: 255 }),
   nickname: varchar('nickname', { length: 128 }),
@@ -44,15 +62,32 @@ export const users = pgTable('users', {
   last_login_at: timestamp('last_login_at', { withTimezone: true }),
   last_login_ip: varchar('last_login_ip', { length: 64 }),
   metadata: jsonb('metadata'),
+  department_id: uuid('department_id'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }),
 }, (table) => [
-  index('users_tenant_id_idx').on(table.tenant_id),
-  index('users_department_id_idx').on(table.department_id),
-  index('users_email_idx').on(table.email),
-  index('users_username_idx').on(table.username),
-  index('users_status_idx').on(table.status),
-  index('users_created_at_idx').on(table.created_at),
+  uniqueIndex('users_tenant_id_username_key').on(table.tenant_id, table.username),
+]);
+
+// 用户角色关联表
+export const user_roles = pgTable('user_roles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  user_id: uuid('user_id').notNull().references(() => users.id),
+  role_id: uuid('role_id').notNull().references(() => roles.id),
+  granted_by: uuid('granted_by').references(() => users.id),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('user_roles_user_id_role_id_key').on(table.user_id, table.role_id),
+]);
+
+// 用户部门关联表
+export const user_departments = pgTable('user_departments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  user_id: uuid('user_id').notNull().references(() => users.id),
+  department_id: uuid('department_id').notNull().references(() => departments.id),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('user_departments_user_id_department_id_key').on(table.user_id, table.department_id),
 ]);
 
 // OAuth 客户端表
@@ -60,9 +95,8 @@ export const oauth_clients = pgTable('oauth_clients', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenant_id: uuid('tenant_id').references(() => tenants.id).notNull(),
   name: varchar('name', { length: 128 }).notNull(),
-  client_id: varchar('client_id', { length: 64 }).notNull().unique(),
+  client_id: varchar('client_id', { length: 64 }).notNull(),
   client_secret: varchar('client_secret', { length: 255 }),
-  client_secret_plain: varchar('client_secret_plain', { length: 255 }),
   redirect_uris: text('redirect_uris').array(),
   grant_types: text('grant_types').array(),
   scopes: text('scopes').array(),
@@ -70,10 +104,9 @@ export const oauth_clients = pgTable('oauth_clients', {
   metadata: jsonb('metadata'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { withTimezone: true }),
+  client_secret_plain: varchar('client_secret_plain', { length: 255 }),
 }, (table) => [
-  index('oauth_clients_tenant_id_idx').on(table.tenant_id),
-  index('oauth_clients_client_id_idx').on(table.client_id),
-  index('oauth_clients_status_idx').on(table.status),
+  uniqueIndex('oauth_clients_client_id_key').on(table.client_id),
 ]);
 
 // 授权记录表
@@ -89,45 +122,33 @@ export const user_authorizations = pgTable('user_authorizations', {
   redirect_uri: text('redirect_uri'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   expires_at: timestamp('expires_at', { withTimezone: true }),
-}, (table) => [
-  index('user_auths_user_id_idx').on(table.user_id),
-  index('user_auths_client_id_idx').on(table.client_id),
-  index('user_auths_authorized_at_idx').on(table.created_at),
-]);
+});
 
 // 用户会话表
 export const user_sessions = pgTable('user_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   user_id: uuid('user_id').notNull().references(() => users.id),
-  token_hash: varchar('token_hash', { length: 255 }).notNull().unique(),
-  refresh_token_hash: varchar('refresh_token_hash', { length: 255 }).notNull().unique(),
+  token_hash: varchar('token_hash', { length: 255 }).notNull(),
+  refresh_token_hash: varchar('refresh_token_hash', { length: 255 }).notNull(),
   expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
   ip_address: varchar('ip_address', { length: 64 }),
   user_agent: text('user_agent'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  index('user_sessions_user_id_idx').on(table.user_id),
-  index('user_sessions_token_hash_idx').on(table.token_hash),
-  index('user_sessions_refresh_token_hash_idx').on(table.refresh_token_hash),
-  index('user_sessions_expires_at_idx').on(table.expires_at),
+  uniqueIndex('user_sessions_token_hash_key').on(table.token_hash),
 ]);
 
 // 审计日志表
 export const audit_logs = pgTable('audit_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenant_id: uuid('tenant_id').references(() => tenants.id),
-  user_id: uuid('user_id'),
+  user_id: uuid('user_id').references(() => users.id),
   event_type: varchar('event_type', { length: 64 }).notNull(),
   ip_address: varchar('ip_address', { length: 64 }),
   user_agent: text('user_agent'),
   details: jsonb('details'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  index('audit_logs_tenant_id_idx').on(table.tenant_id),
-  index('audit_logs_user_id_idx').on(table.user_id),
-  index('audit_logs_event_type_idx').on(table.event_type),
-  index('audit_logs_created_at_idx').on(table.created_at),
-]);
+});
 
 // 第三方账户表
 export const third_party_accounts = pgTable('third_party_accounts', {
@@ -140,17 +161,33 @@ export const third_party_accounts = pgTable('third_party_accounts', {
   metadata: jsonb('metadata'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  index('third_party_user_id_idx').on(table.user_id),
-  index('third_party_provider_idx').on(table.provider),
-  index('third_party_provider_user_id_idx').on(table.provider, table.provider_user_id),
+  uniqueIndex('third_party_accounts_provider_provider_user_id_key').on(table.provider, table.provider_user_id),
 ]);
+
+// 健康检查表
+export const health_check = pgTable('health_check', {
+  id: integer('id').primaryKey(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 // 类型导出
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = typeof tenants.$inferInsert;
 
+export type Department = typeof departments.$inferSelect;
+export type InsertDepartment = typeof departments.$inferInsert;
+
+export type Role = typeof roles.$inferSelect;
+export type InsertRole = typeof roles.$inferInsert;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+export type UserRole = typeof user_roles.$inferSelect;
+export type InsertUserRole = typeof user_roles.$inferInsert;
+
+export type UserDepartment = typeof user_departments.$inferSelect;
+export type InsertUserDepartment = typeof user_departments.$inferInsert;
 
 export type OAuthClient = typeof oauth_clients.$inferSelect;
 export type InsertOAuthClient = typeof oauth_clients.$inferInsert;
@@ -166,6 +203,3 @@ export type InsertAuditLog = typeof audit_logs.$inferInsert;
 
 export type ThirdPartyAccount = typeof third_party_accounts.$inferSelect;
 export type InsertThirdPartyAccount = typeof third_party_accounts.$inferInsert;
-
-export type Department = typeof departments.$inferSelect;
-export type InsertDepartment = typeof departments.$inferInsert;
