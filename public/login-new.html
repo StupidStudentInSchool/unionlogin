@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - Identity Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 to-white min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+    <div class="text-center mb-8">
+      <h1 class="text-2xl font-bold text-gray-900">Identity Center</h1>
+      <p class="text-gray-500 mt-2">统一身份认证中心</p>
+    </div>
+
+    <div id="error" class="hidden mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm"></div>
+    
+    <form id="form" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">租户</label>
+        <select id="tenant" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+          <option value="">加载中...</option>
+        </select>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+        <input id="username" type="text" value="admin" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+        <input id="password" type="password" value="Admin123!" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+      </div>
+      
+      <button id="btn" type="submit" class="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors">
+        登录
+      </button>
+    </form>
+
+    <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+      <p class="text-xs text-gray-500 mb-2">测试账号:</p>
+      <p class="text-xs text-gray-600">租户: 选择列表中的租户</p>
+      <p class="text-xs text-gray-600">用户名: admin</p>
+      <p class="text-xs text-gray-600">密码: Admin123!</p>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    
+    // 加载租户列表
+    async function loadTenants() {
+      try {
+        const res = await fetch(`${API}/api/tenants`);
+        const data = await res.json();
+        const select = document.getElementById('tenant');
+        
+        if (data.success && data.data && data.data.length > 0) {
+          select.innerHTML = '<option value="">请选择租户</option>' +
+            data.data.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+        } else {
+          select.innerHTML = '<option value="">没有可用租户，请先初始化</option>';
+        }
+      } catch (err) {
+        console.error('加载租户失败', err);
+        document.getElementById('tenant').innerHTML = '<option value="">加载失败</option>';
+      }
+    }
+
+    // 显示错误
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // 登录
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const tenantId = document.getElementById('tenant').value;
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      if (!tenantId) {
+        showError('请选择租户');
+        return;
+      }
+
+      const btn = document.getElementById('btn');
+      btn.disabled = true;
+      btn.textContent = '登录中...';
+
+      try {
+        console.log('[LOGIN] 开始登录, tenant:', tenantId);
+        
+        const res = await fetch(`${API}/api/users/login`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-tenant-id': tenantId 
+          },
+          body: JSON.stringify({ login: username, password }),
+        });
+        
+        const data = await res.json();
+        console.log('[LOGIN] 响应:', data);
+
+        if (data.success && data.data && data.data.accessToken) {
+          const { accessToken, refreshToken, user } = data.data;
+          
+          console.log('[LOGIN] Token:', accessToken);
+          console.log('[LOGIN] User:', user);
+          
+          // 存储
+          localStorage.setItem('idc_access_token', accessToken);
+          localStorage.setItem('idc_refresh_token', refreshToken || '');
+          localStorage.setItem('idc_tenant_id', user.tenant_id || tenantId);
+          localStorage.setItem('idc_user', JSON.stringify(user));
+          
+          // 验证存储
+          const stored = localStorage.getItem('idc_access_token');
+          console.log('[LOGIN] 存储验证:', stored === accessToken ? '成功' : '失败');
+          
+          if (stored === accessToken) {
+            alert('登录成功！即将跳转...');
+            window.location.href = '/dashboard.html';
+          } else {
+            showError('Token 存储失败，请重试');
+          }
+        } else {
+          showError(data.message || '登录失败');
+        }
+      } catch (err) {
+        console.error('[LOGIN] 错误:', err);
+        showError('登录失败: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '登录';
+      }
+    });
+
+    // 页面加载时
+    loadTenants();
+  </script>
+</body>
+</html>

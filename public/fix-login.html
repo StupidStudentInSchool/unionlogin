@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一键登录 - Identity Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+  <div class="max-w-md mx-auto">
+    <div class="bg-white rounded-lg shadow p-6">
+      <h1 class="text-xl font-bold mb-4">一键登录修复</h1>
+      
+      <div id="status" class="mb-4 p-4 bg-gray-50 rounded">
+        <p class="text-gray-600">点击下方按钮一键登录</p>
+      </div>
+      
+      <div class="space-y-3">
+        <button onclick="autoLogin()" class="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+          一键登录 (admin)
+        </button>
+        
+        <button onclick="checkStatus()" class="w-full py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">
+          检查当前状态
+        </button>
+        
+        <button onclick="clearAndLogin()" class="w-full py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">
+          清理并重新登录
+        </button>
+      </div>
+      
+      <div class="mt-6 p-4 bg-gray-50 rounded text-xs font-mono" id="log">
+        日志输出区域
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    const KEYS = ['idc_access_token', 'idc_refresh_token', 'idc_tenant_id', 'idc_user'];
+    
+    function log(msg) {
+      const el = document.getElementById('log');
+      el.innerHTML = `<p>${new Date().toLocaleTimeString()}: ${msg}</p>` + el.innerHTML;
+      console.log(msg);
+    }
+    
+    function setStatus(msg, success = true) {
+      const el = document.getElementById('status');
+      el.className = `mb-4 p-4 rounded ${success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`;
+      el.innerHTML = `<p>${msg}</p>`;
+    }
+    
+    function checkStatus() {
+      const token = localStorage.getItem('idc_access_token');
+      const tenant = localStorage.getItem('idc_tenant_id');
+      const user = localStorage.getItem('idc_user');
+      
+      log(`Token: ${token ? token.substring(0, 20) + '...' : '无'}`);
+      log(`Tenant: ${tenant || '无'}`);
+      log(`User: ${user ? JSON.parse(user).username : '无'}`);
+      
+      if (token && tenant && user) {
+        setStatus('已有登录信息，点击"一键登录"重新登录', false);
+      } else {
+        setStatus('未登录，点击"一键登录"按钮', false);
+      }
+    }
+    
+    async function autoLogin() {
+      log('开始登录...');
+      setStatus('登录中...', false);
+      
+      try {
+        // 1. 获取租户
+        log('获取租户列表...');
+        const tenantsRes = await fetch(`${API}/api/tenants`);
+        const tenantsData = await tenantsRes.json();
+        
+        if (!tenantsData.data || tenantsData.data.length === 0) {
+          throw new Error('没有可用租户');
+        }
+        
+        const tenant = tenantsData.data[0];
+        log(`使用租户: ${tenant.name} (${tenant.id})`);
+        
+        // 2. 登录
+        log('发送登录请求...');
+        const loginRes = await fetch(`${API}/api/users/login`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Tenant-Id': tenant.id 
+          },
+          body: JSON.stringify({ login: 'admin', password: 'Admin123!' })
+        });
+        
+        const loginData = await loginRes.json();
+        log(`登录响应: ${JSON.stringify(loginData.success)}`);
+        
+        if (!loginData.success || !loginData.data?.accessToken) {
+          throw new Error(loginData.message || '登录失败');
+        }
+        
+        const { accessToken, refreshToken, user } = loginData.data;
+        
+        // 3. 存储到 localStorage
+        log('存储登录信息...');
+        localStorage.setItem('idc_access_token', accessToken);
+        localStorage.setItem('idc_refresh_token', refreshToken || '');
+        localStorage.setItem('idc_tenant_id', user.tenant_id);
+        localStorage.setItem('idc_user', JSON.stringify(user));
+        
+        // 4. 验证
+        const stored = localStorage.getItem('idc_access_token');
+        log(`验证存储: ${stored === accessToken ? '成功' : '失败'}`);
+        
+        if (stored !== accessToken) {
+          throw new Error('存储失败');
+        }
+        
+        // 5. 测试 API
+        log('测试 API...');
+        const testRes = await fetch(`${API}/api/users?tenantId=${user.tenant_id}`, {
+          headers: { 
+            'Authorization': `Bearer ${accessToken}`,
+            'X-Tenant-Id': user.tenant_id 
+          }
+        });
+        
+        log(`API 测试: HTTP ${testRes.status}`);
+        
+        if (testRes.status === 200) {
+          setStatus('✅ 登录成功！3秒后跳转...');
+          setTimeout(() => {
+            window.location.href = '/dashboard.html';
+          }, 3000);
+        } else {
+          setStatus('API 测试失败，但登录成功', false);
+        }
+        
+      } catch (err) {
+        log(`错误: ${err.message}`);
+        setStatus(`❌ 失败: ${err.message}`, false);
+      }
+    }
+    
+    function clearAndLogin() {
+      log('清理 localStorage...');
+      KEYS.forEach(k => localStorage.removeItem(k));
+      autoLogin();
+    }
+    
+    // 页面加载时检查状态
+    checkStatus();
+  </script>
+</body>
+</html>
