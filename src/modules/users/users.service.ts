@@ -94,14 +94,23 @@ export class UsersService {
     const expiresAt = new Date(Date.now() + 3600 * 1000); // 1小时后过期
 
     const client = getSupabaseClient();
-    await client.from('user_sessions').insert({
+    
+    // 插入 session 并检查是否成功
+    const { data: sessionData, error: sessionError } = await client.from('user_sessions').insert({
       user_id: user.id,
       token_hash: accessToken,
       refresh_token_hash: refreshToken,
       ip_address: ipAddress || '',
       user_agent: userAgent || '',
       expires_at: expiresAt.toISOString(),
-    });
+    }).select();
+
+    if (sessionError) {
+      console.error('[Login] Session 创建失败:', sessionError);
+      throw new Error('登录失败：无法创建会话');
+    }
+    
+    console.log('[Login] Session 创建成功:', sessionData?.[0]?.id || 'unknown');
 
     // 获取用户角色和部门信息
     const roles = await roleService.getUserRoleCodes(user.id);
