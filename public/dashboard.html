@@ -254,10 +254,31 @@
 
       // 加载数据（即使失败也不跳转，只显示错误）
       try {
-        await Promise.all([loadApps(), loadUsers()]);
+        await Promise.all([loadApps(), loadUsers(), loadStats()]);
       } catch (err) {
         console.error('[DASHBOARD] 加载数据失败', err);
         // 不跳转，只显示错误信息
+      }
+    }
+
+    async function loadStats() {
+      try {
+        console.log('[DEBUG] loadStats called');
+        const tenant = localStorage.getItem(STORAGE_KEYS.tenant);
+        const headers = getHeaders();
+
+        const url = tenant ? `${API}/api/users/stats?tenantId=${tenant}` : `${API}/api/users/stats`;
+        const res = await fetch(url, { headers });
+        if (handleAuthError(res)) return;
+        console.log('[DEBUG] stats response status:', res.status);
+        const data = await res.json();
+        console.log('[DEBUG] stats data:', data);
+
+        // 更新统计数据
+        document.getElementById('stat-sessions').textContent = data.data?.activeSessions || data.activeSessions || 0;
+        document.getElementById('stat-today').textContent = data.data?.todayActive || data.todayActive || 0;
+      } catch (err) {
+        console.error('[ERROR] 加载统计失败', err);
       }
     }
 

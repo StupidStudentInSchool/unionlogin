@@ -95,4 +95,12 @@ export class UsersController {
     await usersService.assignDepartment(userId, body.departmentId);
     return { success: true };
   }
+
+  @UseGuards(AuthGuard)
+  @Get('stats')
+  @ApiOperation({ summary: '获取统计数据' })
+  async getStats(@Req() req: Request) {
+    const tenantId = (req.headers['x-tenant-id'] as string) || undefined;
+    return usersService.getStats(tenantId);
+  }
 }

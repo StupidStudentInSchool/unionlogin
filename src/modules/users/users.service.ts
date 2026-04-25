@@ -409,6 +409,72 @@ export class UsersService {
       metadata: { department_id: departmentId },
     });
   }
+
+  // 获取统计数据
+  async getStats(tenantId?: string): Promise<{ activeSessions: number; todayActive: number }> {
+    const client = getSupabaseClient();
+
+    // 活跃会话数：未过期的会话
+    const now = new Date().toISOString();
+    let sessionQuery = client
+      .from('user_sessions')
+      .select('id', { count: 'exact', head: true })
+      .gt('expires_at', now);
+
+    // 今日活跃用户数：今天登录过的用户
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStartStr = todayStart.toISOString();
+
+    let userQuery = client
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .gte('last_login_at', todayStartStr);
+
+    // 如果有租户 ID，需要过滤
+    if (tenantId && tenantId !== 'default') {
+      // 通过 user_sessions 关联用户来过滤租户
+      // 先获取该租户的用户 ID 列表
+      const { data: tenantUsers } = await client
+        .from('users')
+        .select('id')
+        .eq('tenant_id', tenantId);
+
+      const userIds = (tenantUsers || []).map(u => u.id);
+
+      if (userIds.length > 0) {
+        // 活跃会话：只统计该租户用户的会话
+        const { count: sessionCount } = await client
+          .from('user_sessions')
+          .select('id', { count: 'exact', head: true })
+          .in('user_id', userIds)
+          .gt('expires_at', now);
+
+        // 今日活跃：统计今天登录的用户
+        const { count: todayCount } = await client
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .in('id', userIds)
+          .gte('last_login_at', todayStartStr);
+
+        return {
+          activeSessions: sessionCount || 0,
+          todayActive: todayCount || 0,
+        };
+      } else {
+        return { activeSessions: 0, todayActive: 0 };
+      }
+    }
+
+    // 无租户过滤，全局统计
+    const { count: sessionCount } = await sessionQuery;
+    const { count: todayCount } = await userQuery;
+
+    return {
+      activeSessions: sessionCount || 0,
+      todayActive: todayCount || 0,
+    };
+  }
 }
 
 export const usersService = new UsersService();
