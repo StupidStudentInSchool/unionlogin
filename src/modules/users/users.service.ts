@@ -580,14 +580,18 @@ export class UsersService {
       }));
     }
 
-    // 获取用户已授权的应用
+    // 获取用户已授权的应用（只查询存在的应用，过滤孤儿记录）
     const { data: permissions } = await client
       .from('user_app_permissions')
       .select('app_id, granted_by, created_at')
       .eq('user_id', userId);
 
+    // 构建授权映射，只保留存在于应用列表中的授权
+    const validAppIds = new Set((allApps || []).map((a) => a.id));
     const permissionMap = new Map(
-      (permissions || []).map((p) => [p.app_id, p]),
+      (permissions || [])
+        .filter((p) => validAppIds.has(p.app_id))
+        .map((p) => [p.app_id, p]),
     );
 
     return (allApps || []).map((app) => ({
@@ -596,6 +600,46 @@ export class UsersService {
       isGrantedByDefault: false,
       grantedAt: permissionMap.get(app.id)?.created_at || null,
     }));
+  }
+
+  // 清理孤儿授权记录（应用已被删除的授权记录）
+  async cleanOrphanPermissions(): Promise<number> {
+    const client = getSupabaseClient();
+
+    // 删除应用不存在的授权记录
+    const { data: orphanRecords } = await client
+      .from('user_app_permissions')
+      .select('id, app_id');
+
+    if (!orphanRecords || orphanRecords.length === 0) {
+      return 0;
+    }
+
+    // 获取所有存在的应用 ID
+    const { data: existingApps } = await client
+      .from('oauth_clients')
+      .select('id');
+
+    const existingAppIds = new Set((existingApps || []).map((a) => a.id));
+    const orphanIds = (orphanRecords || [])
+      .filter((r) => !existingAppIds.has(r.app_id))
+      .map((r) => r.id);
+
+    if (orphanIds.length === 0) {
+      return 0;
+    }
+
+    const { error } = await client
+      .from('user_app_permissions')
+      .delete()
+      .in('id', orphanIds);
+
+    if (error) {
+      console.error('清理孤儿授权记录失败:', error.message);
+      return 0;
+    }
+
+    return orphanIds.length;
   }
 
   // 授权用户访问应用

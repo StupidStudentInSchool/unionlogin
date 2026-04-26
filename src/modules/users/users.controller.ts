@@ -174,4 +174,12 @@ export class UsersController {
     const hasPermission = await usersService.hasAppPermission(userId, appId);
     return { hasPermission };
   }
+
+  @UseGuards(AuthGuard)
+  @Post('clean-orphan-permissions')
+  @ApiOperation({ summary: '清理孤儿授权记录（管理员）' })
+  async cleanOrphanPermissions() {
+    const count = await usersService.cleanOrphanPermissions();
+    return { success: true, cleaned: count };
+  }
 }
