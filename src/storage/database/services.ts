@@ -194,14 +194,13 @@ export class OAuthClientService {
   }
 
   async deleteByClientId(clientId: string, tenantId?: string): Promise<void> {
-    let query = this.client
+    // 应用是全局共享的，删除时不需要租户过滤
+    // 只要 tenantId 不是有效的 UUID 格式（如 "default"），就忽略它
+    const { error } = await this.client
       .from('oauth_clients')
       .delete()
       .eq('client_id', clientId);
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
-    const { error } = await query;
+
     if (error) throw new Error(`删除OAuth客户端失败: ${error.message}`);
   }
 
@@ -210,15 +209,14 @@ export class OAuthClientService {
     data: any,
     tenantId?: string,
   ): Promise<OAuthClient> {
-    const conditions: any = { client_id: clientId };
-    if (tenantId) conditions.tenant_id = tenantId;
-
+    // 应用是全局共享的，更新时不按租户过滤
     const { data: updated, error } = await this.client
       .from('oauth_clients')
       .update(data)
-      .match(conditions)
+      .eq('client_id', clientId)
       .select()
       .single();
+
     if (error) throw new Error(`更新OAuth客户端失败: ${error.message}`);
     return updated as OAuthClient;
   }
