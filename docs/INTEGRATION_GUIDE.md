@@ -919,6 +919,27 @@ Content-Type: application/json
 | `/api/apps/:clientId/secret` | GET | 获取应用密钥 | Bearer Token |
 | `/api/apps/:clientId/regenerate-secret` | POST | 重新生成密钥 | Bearer Token |
 
+**删除应用说明**：
+
+删除应用时会级联删除以下关联数据：
+- `user_app_permissions` - 用户对该应用的授权记录
+- `user_authorizations` - 该应用的授权码记录
+
+```bash
+DELETE /api/apps/:clientId
+Authorization: Bearer {token}
+```
+
+响应：
+
+```json
+{
+  "success": true,
+  "message": "删除成功"
+}
+```
+| `/api/apps/:clientId/regenerate-secret` | POST | 重新生成密钥 | Bearer Token |
+
 ### 5.4 租户管理
 
 | 接口 | 方法 | 说明 | 认证 |

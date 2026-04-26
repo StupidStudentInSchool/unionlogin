@@ -156,6 +156,36 @@ export class AppsService {
 
   // 删除应用
   async deleteApp(clientId: string, tenantId?: string): Promise<void> {
+    const client = getSupabaseClient();
+
+    // 先获取应用 ID
+    const app = await oauthClientService.findByClientId(clientId);
+    if (!app) {
+      throw new Error('应用不存在');
+    }
+
+    // 删除该应用的所有授权记录
+    const { error: permError } = await client
+      .from('user_app_permissions')
+      .delete()
+      .eq('app_id', app.id);
+
+    if (permError) {
+      console.error('删除应用授权记录失败:', permError.message);
+      // 继续删除应用，不因授权记录删除失败而中断
+    }
+
+    // 删除该应用的所有授权码记录
+    const { error: authCodeError } = await client
+      .from('user_authorizations')
+      .delete()
+      .eq('client_id', app.id);
+
+    if (authCodeError) {
+      console.error('删除应用授权码失败:', authCodeError.message);
+    }
+
+    // 最后删除应用本身
     await oauthClientService.deleteByClientId(clientId, tenantId);
   }
 
