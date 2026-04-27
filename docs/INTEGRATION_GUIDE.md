@@ -684,12 +684,22 @@ Authorization: Bearer {admin_token}
 GET https://unionlogin.coze.site/api/auth/authorize
 ```
 
-参数：
+**行为说明**：
+
+此端点遵循 OAuth 2.0 标准，会根据用户状态进行 **HTTP 重定向**：
+
+| 用户状态 | 行为 | 重定向目标 |
+|----------|------|------------|
+| 未登录 | 重定向到登录页面 | `/login.html?client_id=...&redirect_uri=...` |
+| 已登录 + 有权限 | 生成授权码，重定向回应用 | `{redirect_uri}?code=xxx&state=xxx` |
+| 已登录 + 无权限 | 返回错误，重定向回应用 | `{redirect_uri}?error=access_denied&state=xxx` |
+
+**参数**：
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
 | client_id | 是 | 应用的 Client ID |
-| redirect_uri | 是 | 授权成功后的回调地址 |
+| redirect_uri | 是 | 授权成功后的回调地址（需与应用配置匹配） |
 | response_type | 是 | 固定为 `code` |
 | scope | 否 | 权限范围，默认 `openid profile email` |
 | state | 推荐 | CSRF 防护随机字符串 |

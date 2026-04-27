@@ -6,8 +6,11 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { authService } from './auth.service';
 import { usersService } from '../users/users.service';
@@ -28,8 +31,34 @@ export class AuthController {
     @Query('scope') scope: string,
     @Query('state') state: string,
     @Req() req: Request,
+    @Res() res: Response,
   ) {
+    // 验证必填参数
+    if (!clientId || !redirectUri) {
+      throw new HttpException(
+        '缺少必要参数: client_id, redirect_uri',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // 验证应用是否存在及 redirect_uri 是否合法
+    const client = await appsService.findByClientId(clientId);
+    if (!client) {
+      throw new HttpException('无效的 client_id', HttpStatus.BAD_REQUEST);
+    }
+
+    // 验证 redirect_uri 是否在应用的回调地址列表中
+    const redirectUris = client.redirect_uris || [];
+    if (!redirectUris.includes(redirectUri)) {
+      throw new HttpException(
+        'redirect_uri 不匹配',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // 检查用户是否已登录（通过 Authorization header 或 cookie）
     const authHeader = req.headers.authorization;
+    let userId: string | null = null;
 
     if (authHeader) {
       const [type, token] = authHeader.split(' ');
@@ -37,45 +66,37 @@ export class AuthController {
         try {
           const introspection = await authService.introspectToken(token);
           if (introspection.active && introspection.sub) {
-            // 检查用户是否有权限访问该应用
-            const client = await appsService.findByClientId(clientId);
-            if (client) {
-              const hasPermission = await usersService.hasAppPermission(
-                introspection.sub,
-                client.id,
-              );
-              if (!hasPermission) {
-                return {
-                  requireLogin: false,
-                  error: 'access_denied',
-                  errorDescription: '您没有被授权访问此应用',
-                };
-              }
-            }
-
-            const { code, state: newState } =
-              await authService.generateAuthorizationCode(
-                clientId,
-                redirectUri,
-                introspection.sub,
-                scope?.split(' ') || ['openid', 'profile', 'email'],
-              );
-
-            return {
-              requireLogin: false,
-              code,
-              state: newState,
-              redirectUrl: `${redirectUri}?code=${code}&state=${state || newState}`,
-            };
+            userId = introspection.sub;
           }
         } catch {}
       }
     }
 
-    return {
-      requireLogin: true,
-      loginUrl: `/login.html?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope || '')}&state=${encodeURIComponent(state || '')}`,
-    };
+    // 用户未登录：重定向到登录页面
+    if (!userId) {
+      const loginUrl = `/login.html?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${encodeURIComponent(responseType || 'code')}&scope=${encodeURIComponent(scope || 'openid profile email')}&state=${encodeURIComponent(state || '')}`;
+      return res.redirect(loginUrl);
+    }
+
+    // 用户已登录：检查是否有权限访问该应用
+    const hasPermission = await usersService.hasAppPermission(userId, client.id);
+    if (!hasPermission) {
+      // 无权限：重定向回 redirect_uri 并附带错误信息
+      const errorUrl = `${redirectUri}?error=access_denied&error_description=${encodeURIComponent('您没有被授权访问此应用')}&state=${encodeURIComponent(state || '')}`;
+      return res.redirect(errorUrl);
+    }
+
+    // 用户有权限：生成授权码并重定向
+    const { code, state: newState } = await authService.generateAuthorizationCode(
+      clientId,
+      redirectUri,
+      userId,
+      scope?.split(' ') || ['openid', 'profile', 'email'],
+    );
+
+    // 重定向回应用的 redirect_uri
+    const callbackUrl = `${redirectUri}?code=${code}&state=${encodeURIComponent(state || newState || '')}`;
+    return res.redirect(callbackUrl);
   }
 
   @Public()
