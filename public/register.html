@@ -191,6 +191,7 @@
     const redirectUri = urlParams.get('redirect_uri');
     const clientId = urlParams.get('client_id');
     const state = urlParams.get('state');
+    const scope = urlParams.get('scope');
 
     // 密码显示/隐藏
     const togglePassword = document.getElementById('togglePassword');
@@ -341,7 +342,14 @@
             // 跳转
             if (redirectUri && clientId) {
               // 如果有OAuth参数，跳转到授权页面
-              window.location.href = `/api/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state || ''}`;
+              const authParams = new URLSearchParams({
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                response_type: 'code'
+              });
+              if (state) authParams.set('state', state);
+              if (scope) authParams.set('scope', scope);
+              window.location.href = `/api/auth/authorize?${authParams.toString()}`;
             } else {
               // 否则跳转到登录页面或首页
               window.location.href = '/login.html?registered=1';

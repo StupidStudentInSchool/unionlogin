@@ -122,6 +122,7 @@
     const redirectUri = urlParams.get('redirect_uri');
     const clientId = urlParams.get('client_id');
     const state = urlParams.get('state');
+    const scope = urlParams.get('scope');
     const registered = urlParams.get('registered');
 
     // 如果是注册成功后跳转来的，显示提示
@@ -204,6 +205,7 @@
               response_type: 'code'
             });
             if (state) authParams.set('state', state);
+            if (scope) authParams.set('scope', scope);
             window.location.href = `/api/auth/authorize?${authParams.toString()}`;
           } else {
             window.location.href = '/dashboard.html';
