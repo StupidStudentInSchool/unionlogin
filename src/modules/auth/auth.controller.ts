@@ -56,19 +56,37 @@ export class AuthController {
       );
     }
 
-    // 检查用户是否已登录（通过 Authorization header 或 cookie）
-    const authHeader = req.headers.authorization;
+    // 检查用户是否已登录（从 cookie 或 Authorization header 读取 token）
     let userId: string | null = null;
+    let accessToken: string | null = null;
 
-    if (authHeader) {
-      const [type, token] = authHeader.split(' ');
-      if (type === 'Bearer' && token) {
-        try {
-          const introspection = await authService.introspectToken(token);
-          if (introspection.active && introspection.sub) {
-            userId = introspection.sub;
-          }
-        } catch {}
+    // 1. 优先从 cookie 读取 access_token
+    const cookies = req.cookies as Record<string, string> | undefined;
+    if (cookies?.access_token) {
+      accessToken = cookies.access_token;
+    }
+
+    // 2. 其次从 Authorization header 读取
+    if (!accessToken) {
+      const authHeader = req.headers.authorization;
+      if (authHeader) {
+        const [type, token] = authHeader.split(' ');
+        if (type === 'Bearer' && token) {
+          accessToken = token;
+        }
+      }
+    }
+
+    // 3. 验证 token 获取用户信息
+    if (accessToken) {
+      try {
+        const introspection = await authService.introspectToken(accessToken);
+        if (introspection.active && introspection.sub) {
+          userId = introspection.sub;
+        }
+      } catch {
+        // Token 无效，清除无效的 cookie
+        res.clearCookie('access_token');
       }
     }
 

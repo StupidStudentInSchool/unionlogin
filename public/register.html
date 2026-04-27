@@ -335,6 +335,9 @@
             localStorage.setItem('refresh_token', loginResult.data.refresh_token);
             localStorage.setItem('user', JSON.stringify(loginResult.data.user));
 
+            // 同时设置 cookie，供 OAuth 授权流程使用
+            document.cookie = `access_token=${loginResult.data.access_token}; path=/; max-age=3600; SameSite=Lax`;
+
             // 跳转
             if (redirectUri && clientId) {
               // 如果有OAuth参数，跳转到授权页面

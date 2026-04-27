@@ -705,6 +705,8 @@
 
     function logout() {
       Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+      // 清除 cookie
+      document.cookie = 'access_token=; path=/; max-age=0';
       window.location.href = '/login.html';
     }
 

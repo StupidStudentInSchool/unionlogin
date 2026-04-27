@@ -188,6 +188,11 @@
           localStorage.setItem(STORAGE_KEYS.refresh, loginData.refreshToken || '');
           localStorage.setItem(STORAGE_KEYS.tenant, actualTenantId || '');
           localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(loginData.user || {}));
+          
+          // 同时设置 cookie，供 OAuth 授权流程使用
+          // cookie 有效期与 access_token 一致（1小时）
+          document.cookie = `access_token=${loginData.accessToken}; path=/; max-age=3600; SameSite=Lax`;
+          
           console.log('[LOGIN] 保存成功, token:', loginData.accessToken?.substring(0, 20) + '...');
           console.log('[LOGIN] tenant:', actualTenantId);
 

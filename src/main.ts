@@ -3,11 +3,18 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as express from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // 启用 cookie 解析
+  app.use(express.urlencoded({ extended: true }));
+  // 使用 require 方式引入 cookie-parser
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  app.use(require('cookie-parser')());
 
   // 启用静态文件服务
   app.useStaticAssets(join(__dirname, '..', 'public'), {
