@@ -60,10 +60,17 @@ export class AuthController {
     let userId: string | null = null;
     let accessToken: string | null = null;
 
+    // 调试日志：打印所有 cookies
+    console.log('[Authorize] 收到请求');
+    console.log('[Authorize] cookies:', req.cookies);
+    console.log('[Authorize] headers.cookie:', req.headers.cookie);
+    console.log('[Authorize] authorization:', req.headers.authorization);
+
     // 1. 优先从 cookie 读取 access_token
     const cookies = req.cookies as Record<string, string> | undefined;
     if (cookies?.access_token) {
       accessToken = cookies.access_token;
+      console.log('[Authorize] 从 cookie 读取到 token:', accessToken?.substring(0, 20) + '...');
     }
 
     // 2. 其次从 Authorization header 读取
@@ -92,9 +99,12 @@ export class AuthController {
 
     // 用户未登录：重定向到登录页面
     if (!userId) {
+      console.log('[Authorize] 用户未登录，重定向到登录页面');
       const loginUrl = `/login.html?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${encodeURIComponent(responseType || 'code')}&scope=${encodeURIComponent(scope || 'openid profile email')}&state=${encodeURIComponent(state || '')}`;
       return res.redirect(loginUrl);
     }
+
+    console.log('[Authorize] 用户已登录:', userId);
 
     // 用户已登录：检查是否有权限访问该应用
     const hasPermission = await usersService.hasAppPermission(userId, client.id);
