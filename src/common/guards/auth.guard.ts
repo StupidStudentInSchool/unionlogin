@@ -27,25 +27,33 @@ export class AuthGuard implements CanActivate {
 
     // 从 Header 获取 Token
     const authHeader = request.headers.authorization;
+    console.log('[AuthGuard] Authorization header:', authHeader?.substring(0, 30) + '...');
     if (!authHeader) {
+      console.log('[AuthGuard] 缺少认证信息');
       throw new UnauthorizedException('缺少认证信息');
     }
 
     const [type, token] = authHeader.split(' ');
+    console.log('[AuthGuard] type:', type, 'token:', token?.substring(0, 20) + '...');
     if (type !== 'Bearer' || !token) {
+      console.log('[AuthGuard] 认证格式不正确');
       throw new UnauthorizedException('认证格式不正确');
     }
 
     // 验证 Token
     try {
+      console.log('[AuthGuard] 查找 token:', token?.substring(0, 20) + '...');
       const introspection = await sessionService.findByAccessToken(token);
 
       if (!introspection) {
+        console.log('[AuthGuard] Token 无效 - 未找到 session');
         throw new UnauthorizedException('Token 无效');
       }
 
+      console.log('[AuthGuard] 找到 session, user_id:', introspection.user_id);
       const expiresAt = new Date(introspection.expires_at);
       if (expiresAt < new Date()) {
+        console.log('[AuthGuard] Token 已过期');
         await sessionService.delete(token);
         throw new UnauthorizedException('Token 已过期');
       }

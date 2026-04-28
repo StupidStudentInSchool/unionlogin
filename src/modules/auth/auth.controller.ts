@@ -143,12 +143,17 @@ export class AuthController {
     },
     @Req() req: Request,
   ) {
+    console.log('[Token] 收到请求:', JSON.stringify(body));
+    console.log('[Token] grant_type:', body.grant_type);
+
     if (body.grant_type === 'authorization_code') {
-      return authService.exchangeCodeForToken(
+      const result = await authService.exchangeCodeForToken(
         body.code!,
         body.client_id!,
         body.redirect_uri!,
       );
+      console.log('[Token] 返回 accessToken:', result.accessToken?.substring(0, 20) + '...');
+      return result;
     } else if (body.grant_type === 'refresh_token') {
       return authService.refreshAccessToken(body.refresh_token!);
     }
@@ -158,7 +163,13 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @Get('userinfo')
   @ApiOperation({ summary: '获取用户信息' })
-  async getUserInfo(@CurrentUser('accessToken') accessToken: string) {
+  async getUserInfo(
+    @CurrentUser('accessToken') accessToken: string,
+    @Req() req: Request,
+  ) {
+    console.log('[UserInfo] 收到请求');
+    console.log('[UserInfo] Authorization header:', req.headers.authorization?.substring(0, 30) + '...');
+    console.log('[UserInfo] accessToken:', accessToken?.substring(0, 20) + '...');
     return authService.getUserInfo(accessToken);
   }
 
