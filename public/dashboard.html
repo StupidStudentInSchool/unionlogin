@@ -705,8 +705,13 @@
 
     function logout() {
       Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
-      // 清除 cookie
-      document.cookie = 'access_token=; path=/; max-age=0';
+      // 清除 cookie（需要匹配设置时的属性）
+      const isSecure = window.location.protocol === 'https:';
+      if (isSecure) {
+        document.cookie = 'access_token=; path=/; max-age=0; SameSite=None; Secure';
+      } else {
+        document.cookie = 'access_token=; path=/; max-age=0; SameSite=Lax';
+      }
       window.location.href = '/login.html';
     }
 

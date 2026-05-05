@@ -337,9 +337,15 @@
             localStorage.setItem('user', JSON.stringify(loginResult.data.user));
 
             // 同时设置 cookie，供 OAuth 授权流程使用
-            // 生产环境使用 HTTPS，需要设置 Secure 属性
+            // 使用 SameSite=None; Secure 以支持跨站 OAuth 流程
             const isSecure = window.location.protocol === 'https:';
-            document.cookie = `access_token=${loginResult.data.access_token}; path=/; max-age=3600; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+            if (isSecure) {
+              // HTTPS 环境：使用 SameSite=None; Secure
+              document.cookie = `access_token=${loginResult.data.access_token}; path=/; max-age=3600; SameSite=None; Secure`;
+            } else {
+              // HTTP 环境（开发）：使用 SameSite=Lax
+              document.cookie = `access_token=${loginResult.data.access_token}; path=/; max-age=3600; SameSite=Lax`;
+            }
 
             // 跳转
             if (redirectUri && clientId) {
